@@ -21,19 +21,24 @@ public sealed class Transpiler
     private readonly List<(string Name, List<(string Param, AgType Type)> Params, AgType ReturnType)> _functions = new();
     private readonly List<(string Method, string Pattern, string Handler, bool IsJson)> _routes = new();
     private int? _serverPort;
+    private readonly ModuleLoader? _moduleLoader;
+    private readonly HashSet<string> _emittedModules = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>True after transpilation if the program uses server.listen.</summary>
     public bool IsServerMode => _serverPort is not null;
 
     private readonly bool _requiresHttpClient;
 
-    public Transpiler(Permissions? permissions = null)
+    public Transpiler(Permissions? permissions = null) : this(permissions, null) { }
+
+    internal Transpiler(Permissions? permissions, ModuleLoader? moduleLoader)
     {
         var registry = StdlibModules.Build();
         _emitters = registry.TranspilerEmitters;
         _permissionReqs = registry.PermissionRequirements;
         _permissions = permissions ?? Permissions.None;
         _requiresHttpClient = registry.RequiresHttpClient;
+        _moduleLoader = moduleLoader;
     }
 
     /// <summary>
@@ -182,6 +187,26 @@ public sealed class Transpiler
                 break;
 
             case "import":
+            {
+                if (list.Elements.Count < 2) break;
+                string target = ((AtomNode)list.Elements[1]).Token.Value;
+
+                // File imports — load and inline the imported module's code
+                if ((target.StartsWith("./") || target.StartsWith("../")) && _moduleLoader != null)
+                {
+                    var loaded = _moduleLoader.Load(target);
+                    if (_emittedModules.Add(loaded.FullPath))
+                    {
+                        var childLoader = _moduleLoader.ForDirectory(loaded.FullPath);
+                        var savedLoader = _moduleLoader;
+                        // Transpile the imported module body (functions, defs, structs)
+                        // Tests and exports are already skipped by the transpiler
+                        TranspileNode(loaded.Ast, sb);
+                    }
+                }
+                break;
+            }
+
             case "export":
                 break;
 

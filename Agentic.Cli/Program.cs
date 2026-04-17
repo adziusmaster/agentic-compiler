@@ -126,8 +126,9 @@ static void RunCompile(string filePath, bool emitBinary, string outputFormat, Pe
     string cacheDir = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(filePath)) ?? ".", ".agc-cache");
     var cache = new CompilationCache(cacheDir);
 
+    string basePath = Path.GetDirectoryName(Path.GetFullPath(filePath)) ?? ".";
     var compiler = new Compiler(emitBinary, cache, permissions);
-    var fileResult = compiler.Compile(source, outputName);
+    var fileResult = compiler.Compile(source, outputName, basePath);
     cache.Flush();
 
     Console.WriteLine(outputFormat == "json" ? fileResult.ToJson() : fileResult.ToSExpr());

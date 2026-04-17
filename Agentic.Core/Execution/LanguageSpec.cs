@@ -22,12 +22,21 @@ Num (double), Str (string), Bool (boolean), (Array Num), (Array Str), (Map Str N
 ## Module Structure
 ```
 (module Name
-  (import std.math)        ; load stdlib module
+  (import std.math)           ; load stdlib module
   (import std.string)
   (import std.bool)
-  (export func1 func2)     ; public API
+  (import ""./utils.ag"")       ; import local file module
+  (import ""./lib/helpers"")    ; .ag extension auto-added
+  (export func1 func2)       ; public API — only these are visible to importers
   …body…)
 ```
+
+### Multi-File Imports
+- `(import ""./path.ag"")` loads another .ag module relative to the current file
+- Only `(export ...)` symbols are callable from the importing module
+- Non-exported functions are private — usable internally but hidden from importers
+- Circular imports are detected and rejected
+- Diamond imports (A->B->D, A->C->D) work correctly — D is loaded once
 
 ## Variable Binding
 ```

@@ -166,8 +166,14 @@ public sealed class ProjectCompiler
             if (op == "import")
             {
                 var target = (list.Elements[1] as AtomNode)?.Token.Value;
-                if (target is not null && target.StartsWith("./"))
-                    imports.Add(target[2..]);
+                if (target is not null && (target.StartsWith("./") || target.StartsWith("../")))
+                {
+                    // Strip path prefix and .ag extension for module name lookup
+                    var moduleName = target.TrimStart('.').TrimStart('/');
+                    if (moduleName.EndsWith(".ag", StringComparison.OrdinalIgnoreCase))
+                        moduleName = moduleName[..^3];
+                    imports.Add(moduleName);
+                }
             }
         }
     }

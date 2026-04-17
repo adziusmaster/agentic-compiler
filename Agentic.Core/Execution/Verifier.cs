@@ -15,6 +15,13 @@ public sealed class Verifier
     private readonly ExecutionEnvironment _env = new();
     private readonly Dictionary<string, Func<object[], object>> _nativeLibrary;
     private readonly string[] _inputs;
+    private readonly ModuleLoader? _moduleLoader;
+    private readonly ImportState _importState;
+
+    // Tracks which imported functions are private (non-exported) to enforce visibility
+    private readonly HashSet<string> _importedPrivate = new();
+    private readonly HashSet<string> _importedAll = new();
+    private int _importedCallDepth;
 
     /// <summary>Output captured by <c>(sys.stdout.write …)</c> during evaluation.</summary>
     public string CapturedOutput => _stdoutBuffer.ToString();
@@ -39,10 +46,25 @@ public sealed class Verifier
     /// </summary>
     public bool CollectAllErrors { get; set; }
 
-    public Verifier(string[] inputs = null!)
+    public Verifier(string[] inputs = null!) : this(inputs, null, null) { }
+
+    internal Verifier(string[]? inputs, ModuleLoader? moduleLoader, ImportState? importState)
     {
         _inputs = inputs ?? Array.Empty<string>();
         _nativeLibrary = StdlibModules.Build().VerifierFuncs;
+        _moduleLoader = moduleLoader;
+        _importState = importState ?? new ImportState();
+    }
+
+    /// <summary>
+    /// Shared state for tracking import verification across sub-verifiers.
+    /// Handles circular detection, diamond deduplication, and cached function exports.
+    /// </summary>
+    internal sealed class ImportState
+    {
+        public HashSet<string> Verifying { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public HashSet<string> Verified { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, List<(string Name, ListNode Def, bool Exported)>> ModuleFunctions { get; } = new(StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -301,6 +323,11 @@ public sealed class Verifier
         if (!_env.TryGetFunction(name, out var funcDef))
             throw new InvalidOperationException($"Function '{name}' is not defined. Check spelling or define it with (defun {name} ...).");
 
+        // Export enforcement: private imported functions can only be called from within imported code
+        if (_importedPrivate.Contains(name) && _importedCallDepth == 0)
+            throw new InvalidOperationException(
+                $"Function '{name}' is not exported from its module. Only exported functions can be called from importing modules.");
+
         var sig = TypeAnnotations.ParseDefun(funcDef);
         int provided = list.Elements.Count - 1;
         if (provided != sig.Parameters.Count)
@@ -311,10 +338,12 @@ public sealed class Verifier
         for (int i = 0; i < sig.Parameters.Count; i++)
             frame[sig.Parameters[i].Param] = Evaluate(list.Elements[i + 1])!;
 
+        bool isImported = _importedAll.Contains(name);
+        if (isImported) _importedCallDepth++;
         _env.PushFrame(frame);
         try   { return Evaluate(sig.Body); }
         catch (ReturnException rex) { return rex.Value; }
-        finally { _env.PopFrame(); }
+        finally { _env.PopFrame(); if (isImported) _importedCallDepth--; }
     }
 
     private object ExecuteDef(ListNode list)
@@ -349,17 +378,108 @@ public sealed class Verifier
     }
 
     /// <summary>
-    /// <c>(import std.math)</c> — validates the import is a known stdlib module.
-    /// Currently a no-op since all stdlib is always loaded.
+    /// <c>(import "std.math")</c> — validates stdlib import (no-op, all stdlib always loaded).
+    /// <c>(import "./utils.ag")</c> — loads, verifies, and imports exported symbols from a file.
     /// </summary>
     private object? EvaluateImport(ListNode list)
     {
         if (list.Elements.Count < 2) return null;
         string target = ((AtomNode)list.Elements[1]).Token.Value;
-        if (!target.StartsWith("std.") && !target.StartsWith("./"))
-            throw new InvalidOperationException(
-                $"Unknown import '{target}'. Use 'std.math', 'std.string', 'std.bool', or './local-module'.");
-        return null;
+
+        if (target.StartsWith("std."))
+            return null;
+
+        if (target.StartsWith("./") || target.StartsWith("../"))
+        {
+            if (_moduleLoader == null)
+                throw new InvalidOperationException(
+                    $"Cannot resolve import '{target}': no base path provided. " +
+                    "Use file-based compilation (agc compile <file.ag>) for imports.");
+
+            var loaded = _moduleLoader.Load(target);
+
+            // Circular detection: module is currently being verified up the call chain
+            if (_importState.Verifying.Contains(loaded.FullPath))
+                throw new InvalidOperationException(
+                    $"Circular import detected: '{target}' is already being verified in the import chain.");
+
+            // Diamond dedup: already fully verified — just register its functions
+            if (_importState.Verified.Contains(loaded.FullPath))
+            {
+                RegisterModuleFunctions(loaded.FullPath, loaded.ExportedSymbols);
+                return null;
+            }
+
+            _importState.Verifying.Add(loaded.FullPath);
+            try
+            {
+                var childLoader = _moduleLoader.ForDirectory(loaded.FullPath);
+                var subVerifier = new Verifier(
+                    Array.Empty<string>(),
+                    childLoader,
+                    _importState)
+                {
+                    CollectAllErrors = CollectAllErrors
+                };
+                subVerifier.Evaluate(loaded.Ast);
+
+                _testsPassed += subVerifier.TestsPassed;
+                foreach (var failure in subVerifier.TestFailures)
+                    _testFailures.Add(failure);
+
+                // Collect ALL functions from the sub-verifier for caching
+                CacheModuleFunctions(loaded.FullPath, subVerifier, loaded.ExportedSymbols);
+                _importState.Verified.Add(loaded.FullPath);
+            }
+            finally
+            {
+                _importState.Verifying.Remove(loaded.FullPath);
+            }
+
+            return null;
+        }
+
+        throw new InvalidOperationException(
+            $"Unknown import '{target}'. Use 'std.math', 'std.string', 'std.bool', or './local-module.ag'.");
+    }
+
+    private void CacheModuleFunctions(string fullPath, Verifier subVerifier, IReadOnlyList<string> exports)
+    {
+        var exportSet = new HashSet<string>(exports);
+        var funcs = new List<(string Name, ListNode Def, bool Exported)>();
+
+        // Collect all user-defined functions from the sub-verifier
+        foreach (var name in subVerifier.GetRegisteredFunctionNames())
+        {
+            if (subVerifier._env.TryGetFunction(name, out var funcDef))
+            {
+                bool isExported = exportSet.Contains(name);
+                funcs.Add((name, funcDef, isExported));
+
+                // Register in current verifier
+                _env.RegisterFunction(name, funcDef);
+                _importedAll.Add(name);
+                if (!isExported)
+                    _importedPrivate.Add(name);
+            }
+        }
+
+        _importState.ModuleFunctions[fullPath] = funcs;
+    }
+
+    private void RegisterModuleFunctions(string fullPath, IReadOnlyList<string> exports)
+    {
+        if (!_importState.ModuleFunctions.TryGetValue(fullPath, out var funcs))
+            return;
+
+        var exportSet = new HashSet<string>(exports);
+        foreach (var (name, def, _) in funcs)
+        {
+            _env.RegisterFunction(name, def);
+            _importedAll.Add(name);
+            if (!exportSet.Contains(name))
+                _importedPrivate.Add(name);
+        }
     }
 
     private double ExecuteMath(string op, ListNode list)
@@ -415,6 +535,9 @@ public sealed class Verifier
         _env.RegisterFunction(((AtomNode)list.Elements[1]).Token.Value, list);
         return null;
     }
+
+    /// <summary>Returns all function names registered in this verifier's environment.</summary>
+    internal IEnumerable<string> GetRegisteredFunctionNames() => _env.GetFunctionNames();
 
     private object? ExecuteDefStruct(ListNode list)
     {

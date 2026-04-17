@@ -31,7 +31,8 @@ public sealed class Compiler
     /// </summary>
     /// <param name="source">The S-expression source code.</param>
     /// <param name="outputName">Name for the output binary (without extension).</param>
-    public CompileResult Compile(string source, string outputName = "program")
+    /// <param name="basePath">Directory of the source file, for resolving relative imports.</param>
+    public CompileResult Compile(string source, string outputName = "program", string? basePath = null)
     {
         if (_cache is not null)
         {
@@ -64,7 +65,7 @@ public sealed class Compiler
             };
         }
 
-        var result = Compile(ast, outputName);
+        var result = Compile(ast, outputName, basePath);
 
         if (_cache is not null && result.Success)
             _cache.Store(CompilationCache.ComputeHash(source), result);
@@ -75,13 +76,15 @@ public sealed class Compiler
     /// <summary>
     /// Compiles a pre-parsed AST through the pipeline (type-check → verify → transpile → emit).
     /// </summary>
-    public CompileResult Compile(AstNode ast, string outputName = "program")
+    public CompileResult Compile(AstNode ast, string outputName = "program", string? basePath = null)
     {
         var diagnostics = new List<CompileDiagnostic>();
         int testsPassed = 0;
         int testsFailed = 0;
 
-        var verifier = new Verifier { CollectAllErrors = true };
+        var moduleLoader = basePath != null ? new ModuleLoader(basePath) : null;
+
+        var verifier = new Verifier(null, moduleLoader, null) { CollectAllErrors = true };
         try
         {
             verifier.Evaluate(ast);
@@ -175,7 +178,7 @@ public sealed class Compiler
         bool isServer;
         try
         {
-            var transpiler = new Transpiler(_permissions);
+            var transpiler = new Transpiler(_permissions, moduleLoader);
             csharp = transpiler.Transpile(ast);
             isServer = transpiler.IsServerMode;
         }

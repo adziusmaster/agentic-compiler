@@ -74,4 +74,7 @@ internal sealed class ExecutionEnvironment
 
     public bool TryGetFunction(string name, out ListNode definition) =>
         _functions.TryGetValue(name, out definition!);
+
+    /// <summary>Returns all registered function names.</summary>
+    public IEnumerable<string> GetFunctionNames() => _functions.Keys;
 }
