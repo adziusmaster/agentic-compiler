@@ -150,4 +150,54 @@ public sealed class ServerModuleTests
         result.Success.Should().BeFalse();
         result.Diagnostics.Should().Contain(d => d.Type == "test-failure");
     }
+
+    [Fact]
+    public void JsonGet_ShouldEmitResultsContent()
+    {
+        // Arrange
+        const string source = @"
+            (module Api
+              (defun user_json ((id : Str)) : Str
+                (return (json.object ""id"" id ""status"" ""active"")))
+              (test user (assert-eq (json.get (user_json ""42"") ""id"") ""42""))
+              (server.json_get ""/user/:id"" user_json)
+              (server.listen 8080))";
+
+        var permissions = new Permissions { AllowHttp = true };
+        var compiler = new Compiler(emitBinary: false, permissions: permissions);
+
+        // Act
+        var result = compiler.Compile(source);
+
+        // Assert
+        result.Success.Should().BeTrue();
+        result.GeneratedSource.Should().Contain("Results.Content(");
+        result.GeneratedSource.Should().Contain("application/json");
+    }
+
+    [Fact]
+    public void JsonPost_ShouldParseBodyAndReturnJson()
+    {
+        // Arrange
+        const string source = @"
+            (module Api
+              (defun create_item ((body : Str)) : Str
+                (return (json.object ""received"" body ""status"" ""created"")))
+              (test create (do
+                (def result : Str (create_item ""test data""))
+                (assert-eq (json.get result ""status"") ""created"")))
+              (server.json_post ""/items"" create_item)
+              (server.listen 3000))";
+
+        var permissions = new Permissions { AllowHttp = true };
+        var compiler = new Compiler(emitBinary: false, permissions: permissions);
+
+        // Act
+        var result = compiler.Compile(source);
+
+        // Assert
+        result.Success.Should().BeTrue();
+        result.GeneratedSource.Should().Contain("Results.Content(");
+        result.GeneratedSource.Should().Contain("app.MapPost(\"/items\"");
+    }
 }

@@ -15,6 +15,9 @@ public sealed record Permissions
     /// <summary>Allow making outbound HTTP requests.</summary>
     public bool AllowHttp { get; init; }
 
+    /// <summary>Allow reading environment variables.</summary>
+    public bool AllowEnv { get; init; }
+
     /// <summary>No permissions — pure computation only (default).</summary>
     public static Permissions None => new();
 
@@ -23,7 +26,8 @@ public sealed record Permissions
     {
         AllowFileRead = true,
         AllowFileWrite = true,
-        AllowHttp = true
+        AllowHttp = true,
+        AllowEnv = true
     };
 
     /// <summary>
@@ -36,6 +40,7 @@ public sealed record Permissions
             "file.read"  => AllowFileRead,
             "file.write" => AllowFileWrite,
             "http"       => AllowHttp,
+            "env"        => AllowEnv,
             _            => throw new ArgumentException($"Unknown capability: {capability}")
         };
 

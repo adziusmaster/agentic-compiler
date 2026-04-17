@@ -46,6 +46,7 @@ public static class TypeAnnotations
             return head.Token.Value switch
             {
                 "Array" => AgType.ArrayOf(ParseAnnotation(list.Elements[1])),
+                "Map" when list.Elements.Count >= 3 => AgType.MapOf(ParseAnnotation(list.Elements[2])),
                 _ => AgType.Unknown
             };
         }

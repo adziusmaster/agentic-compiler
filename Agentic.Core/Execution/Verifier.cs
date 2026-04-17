@@ -83,10 +83,13 @@ public sealed class Verifier
                 "defstruct" => ExecuteDefStruct(list),
                 "return"    => throw new ReturnException(Evaluate(list.Elements[1])),
 
-                "arr.new" => new double[Convert.ToInt32(Evaluate(RequireArg(list, 1, "arr.new <size>")))],
-                "arr.get" => ((double[])Evaluate(RequireArg(list, 1, "arr.get <array> <index>"))!)
-                                [Convert.ToInt32(Evaluate(RequireArg(list, 2, "arr.get <array> <index>")))],
-                "arr.set" => ExecuteArraySet(list),
+                "arr.new"    => new double[Convert.ToInt32(Evaluate(RequireArg(list, 1, "arr.new <size>")))],
+                "arr.get"    => ExecuteArrayGet(list),
+                "arr.set"    => ExecuteArraySet(list),
+                "arr.length" => ExecuteArrayLength(list),
+                "arr.map"    => ExecuteArrayMap(list),
+                "arr.filter" => ExecuteArrayFilter(list),
+                "arr.reduce" => ExecuteArrayReduce(list),
 
                 "test"        => ExecuteTest(list),
                 "assert-eq"   => ExecuteAssertEq(list),
@@ -94,6 +97,8 @@ public sealed class Verifier
                 "assert-near" => ExecuteAssertNear(list),
                 "require"     => ExecuteRequire(list),
                 "ensure"      => ExecuteEnsure(list),
+                "try"         => ExecuteTryCatch(list),
+                "throw"       => throw new AgenticRuntimeException(Convert.ToString(Evaluate(list.Elements[1])) ?? "Unknown error"),
 
                 _ => ExecuteFunctionCall(op, list)
             };
@@ -121,14 +126,150 @@ public sealed class Verifier
         return list.Elements[argIndex];
     }
 
+    private object ExecuteArrayGet(ListNode list)
+    {
+        var arr = Evaluate(RequireArg(list, 1, "arr.get <array> <index>"))!;
+        int idx = Convert.ToInt32(Evaluate(RequireArg(list, 2, "arr.get <array> <index>")));
+        return arr switch
+        {
+            double[] da => da[idx],
+            string[] sa => sa[idx],
+            object[] oa => oa[idx],
+            _ => throw new InvalidOperationException($"arr.get: expected array, got {arr.GetType().Name}")
+        };
+    }
+
     private object ExecuteArraySet(ListNode list)
     {
-        var arr = (double[])Evaluate(RequireArg(list, 1, "arr.set <array> <index> <value>"))!;
+        var arr = Evaluate(RequireArg(list, 1, "arr.set <array> <index> <value>"))!;
         int idx  = Convert.ToInt32(Evaluate(RequireArg(list, 2, "arr.set <array> <index> <value>")));
-        double val = Convert.ToDouble(Evaluate(RequireArg(list, 3, "arr.set <array> <index> <value>")));
-        arr[idx] = val;
+        var val = Evaluate(RequireArg(list, 3, "arr.set <array> <index> <value>"))!;
+        switch (arr)
+        {
+            case double[] da: da[idx] = Convert.ToDouble(val); break;
+            case string[] sa: sa[idx] = Convert.ToString(val)!; break;
+            case object[] oa: oa[idx] = val; break;
+            default: throw new InvalidOperationException($"arr.set: expected array, got {arr.GetType().Name}");
+        }
         return val;
     }
+
+    private object ExecuteArrayLength(ListNode list)
+    {
+        var arr = Evaluate(RequireArg(list, 1, "arr.length <array>"))!;
+        return arr switch
+        {
+            double[] da => (double)da.Length,
+            string[] sa => (double)sa.Length,
+            object[] oa => (double)oa.Length,
+            _ => throw new InvalidOperationException($"arr.length: expected array, got {arr.GetType().Name}")
+        };
+    }
+
+    /// <summary>
+    /// (arr.map array func_name) — applies a named function to each element, returns new array.
+    /// </summary>
+    private object ExecuteArrayMap(ListNode list)
+    {
+        var arr = Evaluate(RequireArg(list, 1, "arr.map <array> <func>"))!;
+        string fnName = ((AtomNode)list.Elements[2]).Token.Value;
+
+        if (arr is double[] darr)
+        {
+            var result = new double[darr.Length];
+            for (int i = 0; i < darr.Length; i++)
+                result[i] = Convert.ToDouble(InvokeByName(fnName, darr[i]));
+            return result;
+        }
+        if (arr is string[] sarr)
+        {
+            var result = new string[sarr.Length];
+            for (int i = 0; i < sarr.Length; i++)
+                result[i] = Convert.ToString(InvokeByName(fnName, sarr[i]))!;
+            return result;
+        }
+        throw new InvalidOperationException($"arr.map: expected array, got {arr.GetType().Name}");
+    }
+
+    /// <summary>
+    /// (arr.filter array func_name) — keeps elements where func returns truthy, returns new array.
+    /// </summary>
+    private object ExecuteArrayFilter(ListNode list)
+    {
+        var arr = Evaluate(RequireArg(list, 1, "arr.filter <array> <func>"))!;
+        string fnName = ((AtomNode)list.Elements[2]).Token.Value;
+
+        if (arr is double[] darr)
+        {
+            var result = new List<double>();
+            for (int i = 0; i < darr.Length; i++)
+                if (IsTruthy(InvokeByName(fnName, darr[i])))
+                    result.Add(darr[i]);
+            return result.ToArray();
+        }
+        if (arr is string[] sarr)
+        {
+            var result = new List<string>();
+            for (int i = 0; i < sarr.Length; i++)
+                if (IsTruthy(InvokeByName(fnName, sarr[i])))
+                    result.Add(sarr[i]);
+            return result.ToArray();
+        }
+        throw new InvalidOperationException($"arr.filter: expected array, got {arr.GetType().Name}");
+    }
+
+    /// <summary>
+    /// (arr.reduce array func_name initial) — folds left with a binary function.
+    /// </summary>
+    private object ExecuteArrayReduce(ListNode list)
+    {
+        var arr = Evaluate(RequireArg(list, 1, "arr.reduce <array> <func> <initial>"))!;
+        string fnName = ((AtomNode)list.Elements[2]).Token.Value;
+        var acc = Evaluate(RequireArg(list, 3, "arr.reduce <array> <func> <initial>"))!;
+
+        if (arr is double[] darr)
+        {
+            for (int i = 0; i < darr.Length; i++)
+                acc = InvokeByName(fnName, acc, darr[i])!;
+            return acc;
+        }
+        if (arr is string[] sarr)
+        {
+            for (int i = 0; i < sarr.Length; i++)
+                acc = InvokeByName(fnName, acc, sarr[i])!;
+            return acc;
+        }
+        throw new InvalidOperationException($"arr.reduce: expected array, got {arr.GetType().Name}");
+    }
+
+    /// <summary>Invokes a named user function with the given arguments.</summary>
+    private object? InvokeByName(string name, params object[] args)
+    {
+        if (_nativeLibrary.TryGetValue(name, out var native))
+            return native(args);
+
+        if (!_env.TryGetFunction(name, out var funcDef))
+            throw new InvalidOperationException($"Function '{name}' not found (referenced by arr.map/filter/reduce).");
+
+        var sig = TypeAnnotations.ParseDefun(funcDef);
+        var frame = new Dictionary<string, object>();
+        for (int i = 0; i < sig.Parameters.Count && i < args.Length; i++)
+            frame[sig.Parameters[i].Param] = args[i];
+
+        _env.PushFrame(frame);
+        try   { return Evaluate(sig.Body); }
+        catch (ReturnException rex) { return rex.Value; }
+        finally { _env.PopFrame(); }
+    }
+
+    private static bool IsTruthy(object? val) => val switch
+    {
+        null => false,
+        bool b => b,
+        double d => d != 0.0,
+        string s => s.Length > 0,
+        _ => true
+    };
 
     private object? ExecuteFunctionCall(string name, ListNode list)
     {
@@ -425,4 +566,53 @@ public sealed class Verifier
         bool b => b ? "true" : "false",
         _ => v.ToString() ?? "nil"
     };
+
+    /// <summary>
+    /// <c>(try expr (catch err-var handler))</c> — evaluates expr; on exception,
+    /// binds the error message to err-var and evaluates handler.
+    /// </summary>
+    private object? ExecuteTryCatch(ListNode list)
+    {
+        var tryBody = list.Elements[1];
+
+        // Parse (catch err-var handler) clause
+        var catchClause = (ListNode)list.Elements[2];
+        var catchOp = ((AtomNode)catchClause.Elements[0]).Token.Value;
+        if (catchOp != "catch")
+            throw new InvalidOperationException("try: second argument must be (catch var handler)");
+
+        string errVar = ((AtomNode)catchClause.Elements[1]).Token.Value;
+        var handler = catchClause.Elements[2];
+
+        try
+        {
+            return Evaluate(tryBody);
+        }
+        catch (AgenticRuntimeException ex)
+        {
+            _env.PushFrame(new Dictionary<string, object> { [errVar] = ex.Message });
+            try   { return Evaluate(handler); }
+            finally { _env.PopFrame(); }
+        }
+        catch (ContractViolationException ex)
+        {
+            _env.PushFrame(new Dictionary<string, object> { [errVar] = ex.Message });
+            try   { return Evaluate(handler); }
+            finally { _env.PopFrame(); }
+        }
+        catch (InvalidOperationException ex)
+        {
+            _env.PushFrame(new Dictionary<string, object> { [errVar] = ex.Message });
+            try   { return Evaluate(handler); }
+            finally { _env.PopFrame(); }
+        }
+    }
+}
+
+/// <summary>
+/// Explicit user-thrown error via <c>(throw msg)</c>.
+/// </summary>
+public sealed class AgenticRuntimeException : Exception
+{
+    public AgenticRuntimeException(string message) : base(message) { }
 }

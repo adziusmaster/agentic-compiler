@@ -12,6 +12,7 @@ public abstract record AgType
     public static readonly UnknownType Unknown = new();
 
     public static ArrayType ArrayOf(AgType element) => new(element);
+    public static HashMapType MapOf(AgType valueType) => new(valueType);
 
     /// <summary>
     /// Maps an <see cref="AgType"/> to its C# source representation.
@@ -24,6 +25,9 @@ public abstract record AgType
         ArrayType { Element: NumType } => "double[]",
         ArrayType { Element: StrType } => "string[]",
         ArrayType => "object[]",
+        HashMapType { ValueType: NumType } => "Dictionary<string, double>",
+        HashMapType { ValueType: StrType } => "Dictionary<string, string>",
+        HashMapType => "Dictionary<string, object>",
         StructType s => s.Name,
         _ => "var"
     };
@@ -83,4 +87,10 @@ public sealed record FuncType(IReadOnlyList<AgType> Params, AgType Return) : AgT
 public sealed record UnknownType : AgType
 {
     public override string ToString() => "?";
+}
+
+/// <summary>Key-value dictionary type. Keys are always strings.</summary>
+public sealed record HashMapType(AgType ValueType) : AgType
+{
+    public override string ToString() => $"(Map Str {ValueType})";
 }

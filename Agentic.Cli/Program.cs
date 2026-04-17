@@ -71,6 +71,7 @@ static void PrintUsage()
     Console.WriteLine("  --allow-file-read                 Allow file read only");
     Console.WriteLine("  --allow-file-write                Allow file write only");
     Console.WriteLine("  --allow-http                      Allow outbound HTTP requests");
+    Console.WriteLine("  --allow-env                       Allow reading environment variables");
 }
 
 static string? ParseOption(string[] args, string flag)
@@ -84,6 +85,7 @@ static Permissions ParsePermissions(string[] args) => new()
     AllowFileRead = args.Contains("--allow-file-read") || args.Contains("--allow-file"),
     AllowFileWrite = args.Contains("--allow-file-write") || args.Contains("--allow-file"),
     AllowHttp = args.Contains("--allow-http"),
+    AllowEnv = args.Contains("--allow-env"),
 };
 
 static void RunCompile(string filePath, bool emitBinary, string outputFormat, Permissions? permissions = null)

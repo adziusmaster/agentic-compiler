@@ -19,7 +19,7 @@ public sealed class Transpiler
     private readonly HashSet<string> _declaredStringVars = new();
     private bool _hasMainOutput;
     private readonly List<(string Name, List<(string Param, AgType Type)> Params, AgType ReturnType)> _functions = new();
-    private readonly List<(string Method, string Pattern, string Handler)> _routes = new();
+    private readonly List<(string Method, string Pattern, string Handler, bool IsJson)> _routes = new();
     private int? _serverPort;
 
     /// <summary>True after transpilation if the program uses server.listen.</summary>
@@ -60,6 +60,8 @@ public sealed class Transpiler
     {
         var sb = new StringBuilder();
         sb.AppendLine("using System;");
+        sb.AppendLine("using System.Collections.Generic;");
+        sb.AppendLine("using System.Linq;");
         foreach (var s in _types.Structs.All)
         {
             var fieldList = string.Join(", ", s.Fields.Select(f => $"double {f.Field}"));
@@ -79,6 +81,7 @@ public sealed class Transpiler
         var sb = new StringBuilder();
         sb.AppendLine("using System;");
         sb.AppendLine("using System.IO;");
+        sb.AppendLine("using System.Linq;");
         sb.AppendLine("using Microsoft.AspNetCore.Builder;");
         sb.AppendLine("using Microsoft.AspNetCore.Http;");
         sb.AppendLine();
@@ -101,7 +104,7 @@ public sealed class Transpiler
 
     private void EmitRouteRegistrations(StringBuilder sb)
     {
-        foreach (var (method, pattern, handler) in _routes)
+        foreach (var (method, pattern, handler, isJson) in _routes)
         {
             var routePath = ConvertRoutePattern(pattern);
             var func = _functions.FirstOrDefault(f => f.Name == handler);
@@ -130,9 +133,12 @@ public sealed class Transpiler
             }
 
             string callArgs = string.Join(", ", func.Params.Select(p => p.Param));
-            string returnExpr = func.ReturnType is StrType
-                ? $"{handler}({callArgs})"
-                : $"{handler}({callArgs}).ToString()";
+            string callExpr = $"{handler}({callArgs})";
+
+            // JSON routes return Results.Content with application/json
+            string returnExpr = isJson
+                ? $"Results.Content({callExpr}, \"application/json\")"
+                : (func.ReturnType is StrType ? callExpr : $"{callExpr}.ToString()");
 
             if (hasBodyParam)
             {
@@ -248,7 +254,7 @@ public sealed class Transpiler
                 var route = ((AtomNode)list.Elements[1]).Token.Value;
                 var handler = TypeInferencePass.Sanitize(((AtomNode)list.Elements[2]).Token.Value);
                 _permissions.Require("http");
-                _routes.Add(("Get", route, handler));
+                _routes.Add(("Get", route, handler, false));
                 break;
             }
 
@@ -257,7 +263,25 @@ public sealed class Transpiler
                 var route = ((AtomNode)list.Elements[1]).Token.Value;
                 var handler = TypeInferencePass.Sanitize(((AtomNode)list.Elements[2]).Token.Value);
                 _permissions.Require("http");
-                _routes.Add(("Post", route, handler));
+                _routes.Add(("Post", route, handler, false));
+                break;
+            }
+
+            case "server.json_get":
+            {
+                var route = ((AtomNode)list.Elements[1]).Token.Value;
+                var handler = TypeInferencePass.Sanitize(((AtomNode)list.Elements[2]).Token.Value);
+                _permissions.Require("http");
+                _routes.Add(("Get", route, handler, true));
+                break;
+            }
+
+            case "server.json_post":
+            {
+                var route = ((AtomNode)list.Elements[1]).Token.Value;
+                var handler = TypeInferencePass.Sanitize(((AtomNode)list.Elements[2]).Token.Value);
+                _permissions.Require("http");
+                _routes.Add(("Post", route, handler, true));
                 break;
             }
 
@@ -276,6 +300,22 @@ public sealed class Transpiler
             case "ensure":
                 sb.AppendLine($"    if (!Convert.ToBoolean({TranspileExpression(list.Elements[1])})) throw new Exception(\"Contract violation: postcondition failed\");");
                 break;
+
+            case "throw":
+                sb.AppendLine($"    throw new Exception({TranspileExpression(list.Elements[1])});");
+                break;
+
+            case "try":
+            {
+                var catchClause = (ListNode)list.Elements[2];
+                string errVar = TypeInferencePass.Sanitize(((AtomNode)catchClause.Elements[1]).Token.Value);
+                sb.AppendLine("    try {");
+                TranspileNode(list.Elements[1], sb);
+                sb.AppendLine($"    }} catch (Exception {errVar}) {{");
+                TranspileNode(catchClause.Elements[2], sb);
+                sb.AppendLine("    }");
+                break;
+            }
 
             default:
                 string expr = TranspileExpression(node);
@@ -324,7 +364,34 @@ public sealed class Transpiler
             return $"{TranspileExpression(list.Elements[1])}[(int)({TranspileExpression(list.Elements[2])})]";
         if (op == "arr.set")
             return $"{TranspileExpression(list.Elements[1])}[(int)({TranspileExpression(list.Elements[2])})] = {TranspileExpression(list.Elements[3])}";
-
+        if (op == "arr.length")
+            return $"((double){TranspileExpression(list.Elements[1])}.Length)";
+        if (op == "arr.map")
+        {
+            var arrExpr = TranspileExpression(list.Elements[1]);
+            var fnName = TypeInferencePass.Sanitize(((AtomNode)list.Elements[2]).Token.Value);
+            return $"Array.ConvertAll({arrExpr}, _e => {fnName}(_e))";
+        }
+        if (op == "arr.filter")
+        {
+            var arrExpr = TranspileExpression(list.Elements[1]);
+            var fnName = TypeInferencePass.Sanitize(((AtomNode)list.Elements[2]).Token.Value);
+            return $"Array.FindAll({arrExpr}, _e => Convert.ToBoolean({fnName}(_e)))";
+        }
+        if (op == "arr.reduce")
+        {
+            var arrExpr = TranspileExpression(list.Elements[1]);
+            var fnName = TypeInferencePass.Sanitize(((AtomNode)list.Elements[2]).Token.Value);
+            var init = TranspileExpression(list.Elements[3]);
+            return $"{arrExpr}.Aggregate({init}, (_acc, _e) => {fnName}(_acc, _e))";
+        }
+        if (op == "if")
+        {
+            var cond = TranspileExpression(list.Elements[1]);
+            var then = TranspileExpression(list.Elements[2]);
+            var els = list.Elements.Count > 3 ? TranspileExpression(list.Elements[3]) : "0.0";
+            return $"(Convert.ToBoolean({cond}) ? {then} : {els})";
+        }
         if (_emitters.TryGetValue(op, out var emitter))
         {
             if (_permissionReqs.TryGetValue(op, out var capability))
@@ -410,6 +477,14 @@ public sealed class Transpiler
     /// </summary>
     private void EmitAutoEntryPoint(StringBuilder sb)
     {
+        // If user defined a main() function, call it explicitly.
+        var mainFn = _functions.FirstOrDefault(f => f.Name == "main");
+        if (mainFn != default)
+        {
+            sb.AppendLine("    main();");
+            return;
+        }
+
         if (_hasMainOutput || _functions.Count == 0 || _serverPort is not null)
             return;
 

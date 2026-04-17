@@ -12,6 +12,8 @@ public sealed class ServerModule : IStdlibModule
         // Verifier: route declarations and server start are no-ops during verification
         registry.VerifierFuncs["server.get"] = _ => 0.0;
         registry.VerifierFuncs["server.post"] = _ => 0.0;
+        registry.VerifierFuncs["server.json_get"] = _ => 0.0;
+        registry.VerifierFuncs["server.json_post"] = _ => 0.0;
         registry.VerifierFuncs["server.listen"] = _ => 0.0;
 
         // Transpiler emitters are NOT registered here — the Transpiler handles
@@ -21,6 +23,8 @@ public sealed class ServerModule : IStdlibModule
         // Permissions
         registry.PermissionRequirements["server.get"] = "http";
         registry.PermissionRequirements["server.post"] = "http";
+        registry.PermissionRequirements["server.json_get"] = "http";
+        registry.PermissionRequirements["server.json_post"] = "http";
         registry.PermissionRequirements["server.listen"] = "http";
     }
 }
