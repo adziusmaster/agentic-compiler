@@ -1,7 +1,9 @@
 namespace Agentic.Core.Execution;
 
-// Used as a control-flow signal — thrown by (return ...) and caught by the function call dispatcher.
-// Not a real error; lives here so Verifier and user-defined function dispatch can both reference it.
+/// <summary>
+/// Control-flow signal thrown by <c>(return …)</c> and caught by the function call dispatcher.
+/// Not a real error — used purely to unwind the call stack to the enclosing defun.
+/// </summary>
 internal sealed class ReturnException : Exception
 {
     public object? Value { get; }

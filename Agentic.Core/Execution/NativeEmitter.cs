@@ -1,6 +1,4 @@
-using System;
 using System.Diagnostics;
-using System.IO;
 using System.Runtime.InteropServices;
 
 namespace Agentic.Core.Execution;
@@ -11,7 +9,6 @@ public sealed class NativeEmitter
 
     public NativeEmitter()
     {
-        // Create a temporary workspace for the chaotic build process
         _workspacePath = Path.Combine(Path.GetTempPath(), "AgenticCompiler", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_workspacePath);
     }
@@ -42,7 +39,6 @@ public sealed class NativeEmitter
             }
         };
 
-        // Stream the compiler telemetry to prevent stream buffer deadlocks
         process.OutputDataReceived += (sender, args) =>
         {
             if (!string.IsNullOrWhiteSpace(args.Data))
@@ -73,7 +69,6 @@ public sealed class NativeEmitter
 
     private string GenerateCsproj()
     {
-        // The <PublishAot> flag is what triggers the CoreRT native compilation
         return @"<Project Sdk=""Microsoft.NET.Sdk"">
   <PropertyGroup>
     <OutputType>Exe</OutputType>

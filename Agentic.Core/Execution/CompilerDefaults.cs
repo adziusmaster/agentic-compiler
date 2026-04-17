@@ -1,5 +1,3 @@
-using System.Linq;
-
 namespace Agentic.Core.Execution;
 
 public static class CompilerDefaults

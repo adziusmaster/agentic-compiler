@@ -1,4 +1,3 @@
-using System.IO;
 using System.Text;
 
 namespace Agentic.Core.Execution;
@@ -138,7 +137,6 @@ public sealed class ConstraintParser
 
     private static void ParseSignature(string sig, FunctionSpecBuilder target)
     {
-        // (name arg1 arg2 ...) — the name is informational; we reuse currentFunction.Name.
         string inner = sig.Trim().TrimStart('(').TrimEnd(')').Trim();
         var parts = inner.Split(' ', System.StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length > 1)

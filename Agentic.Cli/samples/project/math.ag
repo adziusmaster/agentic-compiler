@@ -1,0 +1,5 @@
+(module Math
+  (defun add ((a : Num) (b : Num)) : Num (return (+ a b)))
+  (defun mul ((a : Num) (b : Num)) : Num (return (* a b)))
+  (test add (assert-eq (add 3 4) 7))
+  (test mul (assert-eq (mul 3 4) 12)))

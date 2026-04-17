@@ -1,0 +1,6 @@
+(module App
+  (import ./Math)
+  (defun sum_of_products ((a : Num) (b : Num) (c : Num) (d : Num)) : Num
+    (return (add (mul a b) (mul c d))))
+  (test sum_of_products
+    (assert-eq (sum_of_products 2 3 4 5) 26)))

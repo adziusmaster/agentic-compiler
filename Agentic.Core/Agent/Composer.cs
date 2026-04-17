@@ -89,7 +89,6 @@ public sealed class Composer
         if (mainAst is not ListNode rootList || rootList.Elements.Count == 0 ||
             rootList.Elements[0] is not AtomNode head || head.Token.Value != "do")
         {
-            // Best-effort: wrap in (do …) ourselves.
             return BuildDoBlock(helpers.Select(h => h.Source).Append(mainSource.Trim()));
         }
 

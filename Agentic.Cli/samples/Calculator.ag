@@ -1,0 +1,19 @@
+(module Calculator
+  (import std.math)
+
+  (defun add ((a : Num) (b : Num)) : Num
+    (return (+ a b)))
+
+  (defun multiply ((a : Num) (b : Num)) : Num
+    (return (* a b)))
+
+  (test add
+    (assert-eq (add 1 2) 3)
+    (assert-eq (add 0 0) 0)
+    (assert-eq (add 10 20) 30))
+
+  (test multiply
+    (assert-eq (multiply 3 4) 12)
+    (assert-eq (multiply 0 5) 0))
+
+  (sys.stdout.write (str.from_num (add 10 20))))

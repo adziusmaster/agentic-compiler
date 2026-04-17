@@ -1,13 +1,9 @@
-using System.Collections.Generic;
-using System.Linq;
-
 namespace Agentic.Core.Runtime;
 
-// Runtime value for an Agentic (defstruct ...) instance.
-//
-// Records are immutable from the LLM-authored program's point of view: (Foo.set-x p v)
-// returns a new Record — the original is untouched. The underlying dictionary is treated
-// as read-only after construction; With(...) copies before mutating.
+/// <summary>
+/// Immutable runtime value for an Agentic <c>(defstruct …)</c> instance.
+/// <c>With()</c> returns a copy — the original is never mutated.
+/// </summary>
 internal sealed class Record
 {
     public string TypeName { get; }
@@ -25,6 +21,7 @@ internal sealed class Record
             : throw new System.InvalidOperationException(
                 $"Field '{field}' not found on record of type '{TypeName}'.");
 
+    /// <summary>Returns a copy with a single field replaced (wither pattern).</summary>
     public Record With(string field, object value)
     {
         if (!_fields.ContainsKey(field))

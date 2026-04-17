@@ -1,6 +1,3 @@
-using System;
-using System.IO;
-
 namespace Agentic.Core.Execution;
 
 public static class EnvLoader
@@ -13,7 +10,6 @@ public static class EnvLoader
         {
             var trimmed = line.Trim();
             
-            // Ignore empty lines and bash-style comments
             if (string.IsNullOrWhiteSpace(trimmed) || trimmed.StartsWith("#")) 
                 continue;
 
@@ -24,7 +20,6 @@ public static class EnvLoader
             var key = trimmed.Substring(0, separatorIndex).Trim();
             var value = trimmed.Substring(separatorIndex + 1).Trim().Trim('"', '\'');
 
-            // Inject into the running process environment
             Environment.SetEnvironmentVariable(key, value);
         }
     }

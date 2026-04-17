@@ -1,27 +1,30 @@
-using System;
-using System.Collections.Generic;
 using Agentic.Core.Runtime;
 using Agentic.Core.Syntax;
 
 namespace Agentic.Core.Execution;
 
-// First compilation pass: walks the AST once before code generation to determine
-// the type of each defined variable and user function.
-//
-// The inferred types are stored in a centralised environment so the Transpiler
-// and future passes (type-checking, records, higher-order functions) can consult
-// a single source of truth instead of sprinkling ad-hoc predicates.
+/// <summary>
+/// First compilation pass: walks the AST once before code generation to determine
+/// the type of each defined variable and user function.
+/// </summary>
+/// <remarks>
+/// Supports both inferred types (from RHS expressions) and explicit type annotations
+/// via <c>(def x : Num 5)</c> and <c>(defun f ((x : Num)) : Num body)</c> syntax.
+/// </remarks>
 internal sealed class TypeInferencePass
 {
     private readonly Dictionary<string, AgType> _varTypes = new();
     private readonly Dictionary<string, FuncType> _funcTypes = new();
 
-    // Shared with the Verifier's runtime registry in spirit but populated independently —
-    // the Transpiler needs the set of defstructs ahead of time to hoist their C# declarations.
+    /// <summary>
+    /// Registry of <c>(defstruct …)</c> declarations, shared with the Transpiler
+    /// for C# record-struct hoisting.
+    /// </summary>
     public TypeRegistry Structs { get; } = new();
 
-    // ── Public query API ──────────────────────────────────────────────────────
-
+    /// <summary>
+    /// Walks the full AST, populating the variable and function type environments.
+    /// </summary>
     public void Scan(AstNode root)
     {
         _varTypes.Clear();
@@ -41,8 +44,6 @@ internal sealed class TypeInferencePass
     public bool TryGetFuncType(string sanitizedName, out FuncType type) =>
         _funcTypes.TryGetValue(sanitizedName, out type!);
 
-    // ── Inference walk ────────────────────────────────────────────────────────
-
     private void Walk(AstNode node)
     {
         if (node is not ListNode list || list.Elements.Count == 0) return;
@@ -51,34 +52,39 @@ internal sealed class TypeInferencePass
         switch (op)
         {
             case "def":
-            case "set":
-                if (list.Elements.Count >= 3 && list.Elements[1] is AtomNode nameAtom)
+                if (list.Elements.Count >= 3 && list.Elements[1] is AtomNode defAtom)
                 {
-                    var name = Sanitize(nameAtom.Token.Value);
+                    var (rawName, explicitType, valueNode) = TypeAnnotations.ParseDef(list);
+                    var name = Sanitize(rawName);
+                    var resolved = explicitType ?? InferExpression(valueNode);
+                    if (resolved is not UnknownType || !_varTypes.ContainsKey(name))
+                        _varTypes[name] = resolved;
+                }
+                break;
+
+            case "set":
+                if (list.Elements.Count >= 3 && list.Elements[1] is AtomNode setAtom)
+                {
+                    var name = Sanitize(setAtom.Token.Value);
                     var inferred = InferExpression(list.Elements[2]);
-                    // (set …) should not downgrade an already-known array/string back to Unknown
                     if (inferred is not UnknownType || !_varTypes.ContainsKey(name))
                         _varTypes[name] = inferred;
                 }
                 break;
 
             case "defun":
-                if (list.Elements.Count >= 4 &&
-                    list.Elements[1] is AtomNode fnName &&
-                    list.Elements[2] is ListNode paramList)
+                if (list.Elements.Count >= 4 && list.Elements[1] is AtomNode)
                 {
-                    var paramTypes = new List<AgType>(paramList.Elements.Count);
-                    foreach (var _ in paramList.Elements) paramTypes.Add(AgType.Num);
-                    // Return type is currently assumed numeric (Transpiler emits `double`).
-                    // A future pass can tighten this by walking the body for (return ...).
-                    _funcTypes[Sanitize(fnName.Token.Value)] = new FuncType(paramTypes, AgType.Num);
+                    var sig = TypeAnnotations.ParseDefun(list);
+                    _funcTypes[Sanitize(sig.Name)] =
+                        new FuncType(sig.Parameters.Select(p => p.Type).ToList(), sig.ReturnType);
                 }
                 break;
 
             case "defstruct":
-                if (list.Elements.Count >= 3 &&
-                    list.Elements[1] is AtomNode structName &&
-                    list.Elements[2] is ListNode structFields)
+                if (list.Elements.Count >= 3
+                    && list.Elements[1] is AtomNode structName
+                    && list.Elements[2] is ListNode structFields)
                 {
                     var fields = new List<(string, AgType)>(structFields.Elements.Count);
                     foreach (var f in structFields.Elements)
@@ -91,8 +97,9 @@ internal sealed class TypeInferencePass
         foreach (var child in list.Elements) Walk(child);
     }
 
-    // Infers the static type of an expression node without executing it.
-    // Safe to call after Scan(); uses the populated variable/function environments.
+    /// <summary>
+    /// Infers the static type of an expression node without executing it.
+    /// </summary>
     public AgType InferExpression(AstNode node)
     {
         if (node is AtomNode atom)
@@ -124,6 +131,8 @@ internal sealed class TypeInferencePass
             "+" or "-" or "*" or "/"                => AgType.Num,
             "<" or ">" or "=" or "<=" or ">="       => AgType.Bool,
             "not" or "and" or "or"                  => AgType.Bool,
+            "assert-eq" or "assert-true" or "assert-near" => AgType.Bool,
+            "require" or "ensure"                   => AgType.Bool,
             _ when op is not null && Structs.TryResolveOp(op, out var tn, out var member) =>
                 InferStructOp(tn, member),
             _ when op is not null && _funcTypes.TryGetValue(Sanitize(op), out var fn) => fn.Return,
@@ -134,10 +143,10 @@ internal sealed class TypeInferencePass
     private AgType InferStructOp(string typeName, string member)
     {
         if (!Structs.TryGet(typeName, out var t)) return AgType.Unknown;
-        if (member == "new") return t;                    // constructor yields the struct
-        if (member.StartsWith("set-")) return t;          // wither yields the same struct
+        if (member == "new") return t;
+        if (member.StartsWith("set-")) return t;
         foreach (var f in t.Fields)
-            if (f.Field == member) return f.Type;         // field read yields the field's type
+            if (f.Field == member) return f.Type;
         return AgType.Unknown;
     }
 

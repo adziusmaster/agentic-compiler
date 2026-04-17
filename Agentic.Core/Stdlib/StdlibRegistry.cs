@@ -1,17 +1,19 @@
-using System;
-using System.Collections.Generic;
 using Agentic.Core.Syntax;
 
 namespace Agentic.Core.Stdlib;
 
-// Shared registration bag that both Verifier and Transpiler read from.
-// Each IStdlibModule populates both sides in a single Register() call.
+/// <summary>
+/// Shared registration bag consumed by both the Verifier and the Transpiler.
+/// Each <see cref="IStdlibModule"/> populates both sides in a single <c>Register()</c> call.
+/// </summary>
 public sealed class StdlibRegistry
 {
-    // Verifier side: function name → eagerly-evaluated native handler
+    /// <summary>Verifier side: function name → eagerly-evaluated native handler.</summary>
     public Dictionary<string, Func<object[], object>> VerifierFuncs { get; } = new();
 
-    // Transpiler side: function name → emitter delegate
-    // Receives (astArgs, recurse) where recurse translates a child AstNode to a C# expression string.
+    /// <summary>Transpiler side: function name → C# expression emitter (args, recurse).</summary>
     public Dictionary<string, Func<IReadOnlyList<AstNode>, Func<AstNode, string>, string>> TranspilerEmitters { get; } = new();
+
+    /// <summary>Maps function names to the permission capability they require (e.g. "file.read", "http").</summary>
+    public Dictionary<string, string> PermissionRequirements { get; } = new();
 }

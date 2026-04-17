@@ -1,11 +1,11 @@
-using System.Collections.Generic;
 using Agentic.Core.Syntax;
 
 namespace Agentic.Core.Runtime;
 
-// Registry of user-declared (defstruct ...) types. Shared between the Verifier
-// (runtime dispatch for constructors/accessors) and the Transpiler (ahead-of-time
-// hoisting of C# record struct declarations).
+/// <summary>
+/// Registry of user-declared <c>(defstruct …)</c> types, shared between
+/// the Verifier (runtime dispatch) and the Transpiler (C# record-struct hoisting).
+/// </summary>
 internal sealed class TypeRegistry
 {
     private readonly Dictionary<string, StructType> _structs = new();
@@ -17,8 +17,10 @@ internal sealed class TypeRegistry
     public bool TryGet(string name, out StructType type) =>
         _structs.TryGetValue(name, out type!);
 
-    // Splits an op like "Point.x" or "Point.set-x" into (type, member).
-    // Returns false if the type isn't registered.
+    /// <summary>
+    /// Splits an op like <c>"Point.x"</c> or <c>"Point.set-x"</c> into (type, member).
+    /// Returns <c>false</c> if the type isn't registered.
+    /// </summary>
     public bool TryResolveOp(string op, out string typeName, out string member)
     {
         int dot = op.IndexOf('.');

@@ -1,12 +1,9 @@
-using System.Collections.Generic;
-using System.Linq;
-
 namespace Agentic.Core.Syntax;
 
-// The Agentic type lattice. Used by TypeInferencePass to produce a type
-// environment, and by the Transpiler to emit correctly-typed C#.
-//
-// Keep this file free of language-semantic logic — this is a pure data model.
+/// <summary>
+/// Base of the Agentic type lattice. Pure data model consumed by type inference,
+/// verification, and code generation.
+/// </summary>
 public abstract record AgType
 {
     public static readonly NumType Num = new();
@@ -15,33 +12,51 @@ public abstract record AgType
     public static readonly UnknownType Unknown = new();
 
     public static ArrayType ArrayOf(AgType element) => new(element);
+
+    /// <summary>
+    /// Maps an <see cref="AgType"/> to its C# source representation.
+    /// </summary>
+    public static string ToCSharp(AgType type) => type switch
+    {
+        NumType => "double",
+        StrType => "string",
+        BoolType => "bool",
+        ArrayType { Element: NumType } => "double[]",
+        ArrayType { Element: StrType } => "string[]",
+        ArrayType => "object[]",
+        StructType s => s.Name,
+        _ => "var"
+    };
 }
 
+/// <summary>Numeric type (C# <c>double</c>).</summary>
 public sealed record NumType : AgType
 {
-    public override string ToString() => "num";
+    public override string ToString() => "Num";
 }
 
+/// <summary>String type (C# <c>string</c>).</summary>
 public sealed record StrType : AgType
 {
-    public override string ToString() => "str";
+    public override string ToString() => "Str";
 }
 
+/// <summary>Boolean type (C# <c>bool</c>).</summary>
 public sealed record BoolType : AgType
 {
-    public override string ToString() => "bool";
+    public override string ToString() => "Bool";
 }
 
+/// <summary>Homogeneous array type parameterized by element type.</summary>
 public sealed record ArrayType(AgType Element) : AgType
 {
-    public override string ToString() => $"array<{Element}>";
+    public override string ToString() => $"(Array {Element})";
 }
 
-// Reserved for Stage 1C (records) and a later higher-order-functions pass.
-// Declared now so TypeInferencePass doesn't need to change shape later.
+/// <summary>User-declared record type via <c>(defstruct Name (fields…))</c>.</summary>
 public sealed record StructType(string Name, IReadOnlyList<(string Field, AgType Type)> Fields) : AgType
 {
-    public override string ToString() => $"struct {Name}";
+    public override string ToString() => Name;
 
     public bool Equals(StructType? other) =>
         other is not null && Name == other.Name && Fields.SequenceEqual(other.Fields);
@@ -49,10 +64,11 @@ public sealed record StructType(string Name, IReadOnlyList<(string Field, AgType
     public override int GetHashCode() => Name.GetHashCode();
 }
 
+/// <summary>Function type with parameter types and return type.</summary>
 public sealed record FuncType(IReadOnlyList<AgType> Params, AgType Return) : AgType
 {
     public override string ToString() =>
-        $"({string.Join(", ", Params)}) -> {Return}";
+        $"({string.Join(" ", Params)}) -> {Return}";
 
     public bool Equals(FuncType? other) =>
         other is not null && Return == other.Return && Params.SequenceEqual(other.Params);
@@ -60,8 +76,10 @@ public sealed record FuncType(IReadOnlyList<AgType> Params, AgType Return) : AgT
     public override int GetHashCode() => Return.GetHashCode();
 }
 
-// Used when inference cannot determine a type (e.g. a reference before definition,
-// or an identifier fallback). Treated as "don't assert anything" downstream.
+/// <summary>
+/// Placeholder when inference cannot determine a type. Treated as
+/// "don't assert anything" by downstream passes.
+/// </summary>
 public sealed record UnknownType : AgType
 {
     public override string ToString() => "?";

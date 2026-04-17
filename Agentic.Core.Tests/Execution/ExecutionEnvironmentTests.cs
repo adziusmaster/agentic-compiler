@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using Agentic.Core.Execution;
 using FluentAssertions;
 using Xunit;

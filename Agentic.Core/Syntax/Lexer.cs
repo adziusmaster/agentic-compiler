@@ -106,7 +106,23 @@ public sealed class Lexer
         var sb = new StringBuilder();
         while (Current != '"' && Current != '\0')
         {
-            sb.Append(Current);
+            if (Current == '\\')
+            {
+                Advance();
+                sb.Append(Current switch
+                {
+                    '"' => '"',
+                    '\\' => '\\',
+                    'n' => '\n',
+                    't' => '\t',
+                    'r' => '\r',
+                    _ => Current
+                });
+            }
+            else
+            {
+                sb.Append(Current);
+            }
             Advance();
         }
 

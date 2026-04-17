@@ -1,10 +1,5 @@
-using System;
-using System.Linq;
-using System.Net.Http;
 using System.Text;
 using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
 using Agentic.Core.Agent;
 
 namespace Agentic.Core.Execution;
@@ -15,7 +10,6 @@ public sealed class AgentClient : IAgentClient
     private readonly string _apiKey;
     private readonly string _model;
 
-    // Defaulting to gemini-3.1-pro-preview for complex logic, but flash is faster for rapid loops
     public AgentClient(string apiKey, string model = "gemini-2.5-flash")
     {
         _httpClient = new HttpClient();
@@ -45,7 +39,6 @@ public sealed class AgentClient : IAgentClient
 
         string jsonPayload = JsonSerializer.Serialize(payload);
 
-        // Transient Fault Handling (The Shock Absorber)
         int maxRetries = 3;
         for (int i = 0; i < maxRetries; i++)
         {
@@ -83,7 +76,6 @@ public sealed class AgentClient : IAgentClient
 
     private string CleanMarkdown(string input)
     {
-        // LLMs instinctively wrap code in ```lisp ... ```. We strip the armor.
         input = input.Trim();
         if (input.StartsWith("```"))
         {

@@ -1,4 +1,3 @@
-using System;
 using Agentic.Core.Execution;
 using Agentic.Core.Syntax;
 using FluentAssertions;

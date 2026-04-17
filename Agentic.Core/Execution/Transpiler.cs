@@ -1,41 +1,47 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using Agentic.Core.Stdlib;
 using Agentic.Core.Syntax;
 
 namespace Agentic.Core.Execution;
 
-// Gateway: translates a verified AST into C# source code.
-// Language primitives are emitted here; stdlib expressions are delegated to the registry.
+/// <summary>
+/// Translates a verified Agentic AST into C# source code.
+/// Language primitives are emitted here; stdlib expressions delegate to <see cref="StdlibRegistry"/>.
+/// </summary>
 public sealed class Transpiler
 {
     private readonly Dictionary<string, Func<IReadOnlyList<AstNode>, Func<AstNode, string>, string>> _emitters;
-
-    // Type inference results — repopulated at the start of each Transpile() call
+    private readonly Dictionary<string, string> _permissionReqs;
+    private readonly Permissions _permissions;
     private TypeInferencePass _types = new();
-
-    // Tracks which typed variables have already been declared (reset each Transpile() call)
     private readonly HashSet<string> _declaredArrayVars = new();
     private readonly HashSet<string> _declaredStringVars = new();
+    private bool _hasMainOutput;
+    private readonly List<(string Name, List<(string Param, AgType Type)> Params)> _functions = new();
 
-    public Transpiler()
+    public Transpiler(Permissions? permissions = null)
     {
-        _emitters = StdlibModules.Build().TranspilerEmitters;
+        var registry = StdlibModules.Build();
+        _emitters = registry.TranspilerEmitters;
+        _permissionReqs = registry.PermissionRequirements;
+        _permissions = permissions ?? Permissions.None;
     }
 
+    /// <summary>
+    /// Transpiles the full AST into a standalone C# program source.
+    /// </summary>
     public string Transpile(AstNode rootNode)
     {
         _declaredArrayVars.Clear();
         _declaredStringVars.Clear();
+        _hasMainOutput = false;
+        _functions.Clear();
 
         _types = new TypeInferencePass();
         _types.Scan(rootNode);
 
         var sb = new StringBuilder();
         sb.AppendLine("using System;");
-        // Hoist (defstruct …) declarations above Program so they're visible to Main.
         foreach (var s in _types.Structs.All)
         {
             var fieldList = string.Join(", ", s.Fields.Select(f => $"double {f.Field}"));
@@ -44,12 +50,11 @@ public sealed class Transpiler
         sb.AppendLine("class Program {");
         sb.AppendLine("  static void Main(string[] args) {");
         TranspileNode(rootNode, sb);
+        EmitAutoEntryPoint(sb);
         sb.AppendLine("  }");
         sb.AppendLine("}");
         return sb.ToString();
     }
-
-    // ── Statement emitter ─────────────────────────────────────────────────────
 
     private void TranspileNode(AstNode node, StringBuilder sb)
     {
@@ -62,15 +67,31 @@ public sealed class Transpiler
                 for (int i = 1; i < list.Elements.Count; i++) TranspileNode(list.Elements[i], sb);
                 break;
 
+            case "module":
+                for (int i = 2; i < list.Elements.Count; i++) TranspileNode(list.Elements[i], sb);
+                break;
+
+            case "import":
+            case "export":
+                break;
+
             case "def":
+            {
+                var (rawName, explicitType, valueNode) = TypeAnnotations.ParseDef(list);
+                string name = TypeInferencePass.Sanitize(rawName);
+                EmitAssignment(true, name, valueNode, explicitType, sb);
+                break;
+            }
+
             case "set":
             {
                 string name = TypeInferencePass.Sanitize(((AtomNode)list.Elements[1]).Token.Value);
-                EmitAssignment(op == "def", name, list.Elements[2], sb);
+                EmitAssignment(false, name, list.Elements[2], null, sb);
                 break;
             }
 
             case "sys.stdout.write":
+                _hasMainOutput = true;
                 sb.AppendLine($"    Console.Write({TranspileExpression(list.Elements[1])});");
                 break;
 
@@ -89,12 +110,17 @@ public sealed class Transpiler
 
             case "defun":
             {
-                var paramStrs = ((ListNode)list.Elements[2]).Elements
-                    .Select(p => $"double {TypeInferencePass.Sanitize(((AtomNode)p).Token.Value)}");
-                string fnName = TypeInferencePass.Sanitize(((AtomNode)list.Elements[1]).Token.Value);
-                sb.AppendLine($"    double {fnName}({string.Join(", ", paramStrs)}) {{");
-                TranspileNode(list.Elements[3], sb);
-                sb.AppendLine("      return 0;");
+                var sig = TypeAnnotations.ParseDefun(list);
+                string fnName = TypeInferencePass.Sanitize(sig.Name);
+                _functions.Add((fnName, sig.Parameters.Select(p =>
+                    (TypeInferencePass.Sanitize(p.Param), p.Type)).ToList()));
+                var paramStrs = sig.Parameters.Select(p =>
+                    $"{AgType.ToCSharp(p.Type)} {TypeInferencePass.Sanitize(p.Param)}");
+                string retType = AgType.ToCSharp(sig.ReturnType);
+                sb.AppendLine($"    {retType} {fnName}({string.Join(", ", paramStrs)}) {{");
+                TranspileNode(sig.Body, sb);
+                if (!ContainsReturn(sig.Body))
+                    sb.AppendLine($"      return default({retType})!;");
                 sb.AppendLine("    }");
                 break;
             }
@@ -108,7 +134,22 @@ public sealed class Transpiler
                 break;
 
             case "defstruct":
-                // Hoisted above Main — no statement-level emission.
+                break;
+
+            case "test":
+                break;
+
+            case "assert-eq":
+            case "assert-true":
+            case "assert-near":
+                break;
+
+            case "require":
+                sb.AppendLine($"    if (!Convert.ToBoolean({TranspileExpression(list.Elements[1])})) throw new Exception(\"Contract violation: precondition failed\");");
+                break;
+
+            case "ensure":
+                sb.AppendLine($"    if (!Convert.ToBoolean({TranspileExpression(list.Elements[1])})) throw new Exception(\"Contract violation: postcondition failed\");");
                 break;
 
             default:
@@ -118,16 +159,21 @@ public sealed class Transpiler
         }
     }
 
-    // ── Expression emitter ────────────────────────────────────────────────────
-
     private string TranspileExpression(AstNode node)
     {
         if (node is AtomNode atom)
         {
-            if (atom.Token.Type == TokenType.String) return $"\"{atom.Token.Value}\"";
+            if (atom.Token.Type == TokenType.String)
+            {
+                var escaped = atom.Token.Value
+                    .Replace("\\", "\\\\")
+                    .Replace("\"", "\\\"")
+                    .Replace("\n", "\\n")
+                    .Replace("\r", "\\r")
+                    .Replace("\t", "\\t");
+                return $"\"{escaped}\"";
+            }
             if (atom.Token.Type == TokenType.Identifier) return TypeInferencePass.Sanitize(atom.Token.Value);
-            // All numbers in this language are doubles; suffix bare integer literals with .0
-            // so C# infers `double` and avoids CS0266 on mixed arithmetic.
             string numVal = atom.Token.Value;
             return numVal.Contains('.') ? numVal : numVal + ".0";
         }
@@ -136,7 +182,6 @@ public sealed class Transpiler
 
         var op = ((AtomNode)list.Elements[0]).Token.Value;
 
-        // ── Arithmetic / comparison operators ──
         if (op is "+" or "-" or "*" or "/")
             return $"({TranspileExpression(list.Elements[1])} {op} {TranspileExpression(list.Elements[2])})";
         if (op is "<" or ">" or "<=" or ">=")
@@ -144,7 +189,6 @@ public sealed class Transpiler
         if (op == "=")
             return $"({TranspileExpression(list.Elements[1])} == {TranspileExpression(list.Elements[2])})";
 
-        // ── Array / IO primitives (stay here — not in a module) ──
         if (op == "sys.input.get")
             return $"Convert.ToDouble(args[(int)({TranspileExpression(list.Elements[1])})])";
         if (op == "sys.input.get_str")
@@ -156,15 +200,16 @@ public sealed class Transpiler
         if (op == "arr.set")
             return $"{TranspileExpression(list.Elements[1])}[(int)({TranspileExpression(list.Elements[2])})] = {TranspileExpression(list.Elements[3])}";
 
-        // ── Stdlib modules (math, string, bool, …) ──
         if (_emitters.TryGetValue(op, out var emitter))
+        {
+            if (_permissionReqs.TryGetValue(op, out var capability))
+                _permissions.Require(capability);
             return emitter(list.Elements.Skip(1).ToList(), TranspileExpression);
+        }
 
-        // ── Struct dispatch: (Foo.new …), (Foo.field obj), (Foo.set-field obj v) ──
         if (_types.Structs.TryResolveOp(op, out var typeName, out var member))
             return EmitStructOp(typeName, member, list);
 
-        // ── User-defined function fallback ──
         var callArgs = list.Elements.Skip(1).Select(TranspileExpression);
         return $"{TypeInferencePass.Sanitize(op)}({string.Join(", ", callArgs)})";
     }
@@ -182,19 +227,23 @@ public sealed class Transpiler
             return $"({args[0]} with {{ {fieldName} = {args[1]} }})";
         }
 
-        // Plain field read
         string field = TypeInferencePass.Sanitize(member);
         return $"{args[0]}.{field}";
     }
 
-    // ── Declaration decisions, driven by the type environment ────────────────
-    //
-    // Both (def) and (set) route through here. Because variables hoist their declared
-    // C# type from the first assignment that actually matches the inferred type, this
-    // tolerates LLM-generated placeholder forms like `(def arr 0)` followed later by
-    // `(set arr (arr.new 3))` — the latter becomes the real declaration site.
-    private void EmitAssignment(bool isDef, string name, AstNode rhs, StringBuilder sb)
+    /// <summary>
+    /// Emits a variable declaration or assignment. When an explicit type annotation
+    /// is present, it is used directly. Otherwise, the inferred type drives the
+    /// C# declaration to handle array/string hoisting correctly.
+    /// </summary>
+    private void EmitAssignment(bool isDef, string name, AstNode rhs, AgType? explicitType, StringBuilder sb)
     {
+        if (explicitType is not null && explicitType is not UnknownType)
+        {
+            sb.AppendLine($"    {AgType.ToCSharp(explicitType)} {name} = {TranspileExpression(rhs)};");
+            return;
+        }
+
         var varType  = _types.GetVarType(name);
         var exprType = _types.InferExpression(rhs);
 
@@ -207,13 +256,50 @@ public sealed class Transpiler
             sb.AppendLine($"    string {name} = {TranspileExpression(rhs)};");
         else if (varType is ArrayType || varType is StrType)
         {
-            // Variable's eventual type is array/string but this RHS is a placeholder
-            // (e.g. `(def s 0)` before the real string assignment). Skip — the real
-            // assignment will become the declaration site.
+            // Placeholder assignment skipped — the real typed declaration comes later.
         }
         else if (isDef)
             sb.AppendLine($"    var {name} = {TranspileExpression(rhs)};");
         else
             sb.AppendLine($"    {name} = {TranspileExpression(rhs)};");
+    }
+
+    /// <summary>
+    /// Checks whether an AST node (or any descendant) contains a return statement.
+    /// </summary>
+    private static bool ContainsReturn(AstNode node)
+    {
+        if (node is ListNode list && list.Elements.Count > 0)
+        {
+            var op = (list.Elements[0] as AtomNode)?.Token.Value;
+            if (op == "return") return true;
+            return list.Elements.Any(ContainsReturn);
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// When a module defines functions but has no top-level I/O (no sys.stdout.write),
+    /// auto-generates a main entry point that reads CLI args, calls the first function,
+    /// and prints the result.
+    /// </summary>
+    private void EmitAutoEntryPoint(StringBuilder sb)
+    {
+        if (_hasMainOutput || _functions.Count == 0)
+            return;
+
+        var (name, parameters) = _functions[0];
+
+        for (int i = 0; i < parameters.Count; i++)
+        {
+            var (param, type) = parameters[i];
+            if (type is StrType)
+                sb.AppendLine($"    var _arg{i} = args[{i}];");
+            else
+                sb.AppendLine($"    var _arg{i} = Convert.ToDouble(args[{i}]);");
+        }
+
+        var argList = string.Join(", ", Enumerable.Range(0, parameters.Count).Select(i => $"_arg{i}"));
+        sb.AppendLine($"    Console.Write({name}({argList}));");
     }
 }
