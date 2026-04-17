@@ -1,0 +1,31 @@
+version: 0.1
+name: FibonacciString
+
+objective: |
+  Read N from input (index 0). N is always >= 2.
+
+  1. Allocate an array of size N.
+  2. Set arr[0] = 0 and arr[1] = 1.
+  3. Fill the remaining elements (index 2 to N-1) using a while loop:
+       arr[i] = arr[i-1] + arr[i-2]
+  4. Build a comma-separated string of all N values using str.concat and str.from_num.
+     Strategy:
+       - Start: result = (str.from_num (arr.get arr 0))
+       - Loop i from 1 to N-1:
+           result = (str.concat (str.concat result ",") (str.from_num (arr.get arr i)))
+  5. Output the result string using sys.stdout.write.
+
+  CRITICAL RULES:
+  - All math is strictly binary.
+  - The Fibonacci values are whole numbers; str.from_num will format them without decimals.
+  - Do NOT use return at the root level.
+
+permissions:
+  - sys.input.get
+  - sys.stdout.write
+
+tests:
+  - input: [7]
+    expect_stdout: "0,1,1,2,3,5,8"
+  - input: [5]
+    expect_stdout: "0,1,1,2,3"

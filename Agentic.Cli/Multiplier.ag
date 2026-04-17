@@ -1,0 +1,15 @@
+version: 0.1
+name: MultiplierEngine
+
+objective: |
+  Read the first input argument. Multiply it by 5. Output the result.
+
+permissions:
+  - sys.stdout.write
+  - sys.input.get
+
+tests:
+  - input: [10]
+    expect_stdout: "50"
+  - input: [3]
+    expect_stdout: "15"

@@ -1,0 +1,89 @@
+using System;
+using System.Diagnostics;
+using System.IO;
+using System.Runtime.InteropServices;
+
+namespace Agentic.Core.Execution;
+
+public sealed class NativeEmitter
+{
+    private readonly string _workspacePath;
+
+    public NativeEmitter()
+    {
+        // Create a temporary workspace for the chaotic build process
+        _workspacePath = Path.Combine(Path.GetTempPath(), "AgenticCompiler", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(_workspacePath);
+    }
+
+    public string Emit(string transpiledCode, string outputName)
+    {
+        string csFilePath = Path.Combine(_workspacePath, "Program.cs");
+        string csprojPath = Path.Combine(_workspacePath, $"{outputName}.csproj");
+
+        File.WriteAllText(csFilePath, transpiledCode);
+        File.WriteAllText(csprojPath, GenerateCsproj());
+
+        string rid = RuntimeInformation.RuntimeIdentifier;
+        Console.WriteLine($"\n[EMITTER] Workspace locked: {_workspacePath}");
+        Console.WriteLine($"[EMITTER] Engaging AOT Compilation for {rid}...");
+
+        var process = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = "dotnet",
+                Arguments = $"publish -c Release -r {rid} --self-contained true",
+                WorkingDirectory = _workspacePath,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            }
+        };
+
+        // Stream the compiler telemetry to prevent stream buffer deadlocks
+        process.OutputDataReceived += (sender, args) =>
+        {
+            if (!string.IsNullOrWhiteSpace(args.Data))
+                Console.WriteLine($"  [AOT] {args.Data}");
+        };
+
+        process.ErrorDataReceived += (sender, args) =>
+        {
+            if (!string.IsNullOrWhiteSpace(args.Data))
+                Console.WriteLine($"  [AOT ERROR] {args.Data}");
+        };
+
+        process.Start();
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
+        process.WaitForExit();
+
+        if (process.ExitCode != 0)
+        {
+            throw new Exception("Native Compilation Failed. See AOT ERROR logs above.");
+        }
+
+        string extension = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? ".exe" : "";
+        string binaryPath = Path.Combine(_workspacePath, "bin", "Release", "net8.0", rid, "publish", outputName + extension);
+
+        return binaryPath;
+    }
+
+    private string GenerateCsproj()
+    {
+        // The <PublishAot> flag is what triggers the CoreRT native compilation
+        return @"<Project Sdk=""Microsoft.NET.Sdk"">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PublishAot>true</PublishAot>
+    <OptimizationPreference>Speed</OptimizationPreference>
+    <StripSymbols>true</StripSymbols>
+  </PropertyGroup>
+</Project>";
+    }
+}

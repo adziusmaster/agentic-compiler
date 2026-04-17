@@ -1,0 +1,37 @@
+version: 0.1
+name: GradeBook
+
+objective: |
+  Read exactly 3 test scores from input (indices 0, 1, 2).
+  Compute the average: (score0 + score1 + score2) / 3.0
+
+  Determine the letter grade using nested if/else:
+    - "A" if average >= 90
+    - "B" if average >= 80 (and < 90)
+    - "C" if average >= 70 (and < 80)
+    - "D" if average >= 60 (and < 70)
+    - "F" if average < 60
+
+  Output ONLY the single letter grade string using sys.stdout.write.
+
+  HINT — nested if/else pattern:
+    (if (>= avg 90.0)
+      (sys.stdout.write "A")
+      (if (>= avg 80.0)
+        (sys.stdout.write "B")
+        (if (>= avg 70.0)
+          ...)))
+
+  Do NOT use arrays. Read and sum the inputs directly.
+
+permissions:
+  - sys.input.get
+  - sys.stdout.write
+
+tests:
+  - input: [75, 85, 95]
+    expect_stdout: "B"
+  - input: [90, 80, 100]
+    expect_stdout: "A"
+  - input: [65, 70, 75]
+    expect_stdout: "C"

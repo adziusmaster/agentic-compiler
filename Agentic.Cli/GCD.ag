@@ -1,0 +1,24 @@
+version: 0.4
+name: GcdEngine
+
+objective: |
+  Read two input arguments A and B (non-negative integers, at least one > 0).
+  Compute their greatest common divisor using the recursive Euclidean algorithm:
+    gcd(a, 0) = a
+    gcd(a, b) = gcd(b, a mod b)
+  Implement gcd as a (defun ...) that calls itself. Use math.mod for the modulo.
+  Output the result and nothing else.
+
+permissions:
+  - sys.stdout.write
+  - sys.input.get
+
+tests:
+  - input: [48, 18]
+    expect_stdout: "6"
+  - input: [100, 75]
+    expect_stdout: "25"
+  - input: [17, 5]
+    expect_stdout: "1"
+  - input: [42, 0]
+    expect_stdout: "42"
