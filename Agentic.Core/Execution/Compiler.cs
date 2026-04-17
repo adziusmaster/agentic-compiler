@@ -172,9 +172,12 @@ public sealed class Compiler
         }
 
         string csharp;
+        bool isServer;
         try
         {
-            csharp = new Transpiler(_permissions).Transpile(ast);
+            var transpiler = new Transpiler(_permissions);
+            csharp = transpiler.Transpile(ast);
+            isServer = transpiler.IsServerMode;
         }
         catch (PermissionDeniedException ex)
         {
@@ -223,7 +226,7 @@ public sealed class Compiler
         try
         {
             var emitter = new NativeEmitter();
-            string binaryPath = emitter.Emit(csharp, outputName);
+            string binaryPath = emitter.Emit(csharp, outputName, isServer);
             return new CompileResult
             {
                 Success = true,

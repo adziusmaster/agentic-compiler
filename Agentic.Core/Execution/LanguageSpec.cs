@@ -110,6 +110,18 @@ During verification, file ops use an in-memory virtual filesystem.
 ```
 HTTP ops are NOT available during verification (use mock data in tests).
 
+## HTTP Server — requires --allow-http
+```
+(server.get ""/path/:param"" handler_fn)   ; register GET route
+(server.post ""/path"" handler_fn)         ; register POST route
+(server.listen 8080)                      ; start server on port
+```
+Route params use `:name` syntax. Handler functions are regular `defun` functions.
+For GET routes, route params are passed as function arguments.
+For POST routes, non-route `Str` params receive the request body.
+Transpiles to ASP.NET Minimal API (WebApplication).
+Tests still run at compile time. Only route registration + listen are server-specific.
+
 ## JSON (import std.json)
 ```
 (json.get json_str key)         ; extract string value by key

@@ -14,6 +14,7 @@ public static class StdlibModules
         new FileModule(),
         new HttpModule(),
         new JsonModule(),
+        new ServerModule(),
     ];
 
     public static StdlibRegistry Build()

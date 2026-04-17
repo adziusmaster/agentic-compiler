@@ -7,6 +7,7 @@ namespace Agentic.Core.Execution;
 /// <summary>
 /// Translates a verified Agentic AST into C# source code.
 /// Language primitives are emitted here; stdlib expressions delegate to <see cref="StdlibRegistry"/>.
+/// Supports two output modes: CLI (default) and Server (when <c>server.listen</c> is present).
 /// </summary>
 public sealed class Transpiler
 {
@@ -17,7 +18,12 @@ public sealed class Transpiler
     private readonly HashSet<string> _declaredArrayVars = new();
     private readonly HashSet<string> _declaredStringVars = new();
     private bool _hasMainOutput;
-    private readonly List<(string Name, List<(string Param, AgType Type)> Params)> _functions = new();
+    private readonly List<(string Name, List<(string Param, AgType Type)> Params, AgType ReturnType)> _functions = new();
+    private readonly List<(string Method, string Pattern, string Handler)> _routes = new();
+    private int? _serverPort;
+
+    /// <summary>True after transpilation if the program uses server.listen.</summary>
+    public bool IsServerMode => _serverPort is not null;
 
     public Transpiler(Permissions? permissions = null)
     {
@@ -36,10 +42,22 @@ public sealed class Transpiler
         _declaredStringVars.Clear();
         _hasMainOutput = false;
         _functions.Clear();
+        _routes.Clear();
+        _serverPort = null;
 
         _types = new TypeInferencePass();
         _types.Scan(rootNode);
 
+        var body = new StringBuilder();
+        TranspileNode(rootNode, body);
+
+        return _serverPort is not null
+            ? EmitServerProgram(body)
+            : EmitCliProgram(body);
+    }
+
+    private string EmitCliProgram(StringBuilder body)
+    {
         var sb = new StringBuilder();
         sb.AppendLine("using System;");
         foreach (var s in _types.Structs.All)
@@ -49,11 +67,92 @@ public sealed class Transpiler
         }
         sb.AppendLine("class Program {");
         sb.AppendLine("  static void Main(string[] args) {");
-        TranspileNode(rootNode, sb);
+        sb.Append(body);
         EmitAutoEntryPoint(sb);
         sb.AppendLine("  }");
         sb.AppendLine("}");
         return sb.ToString();
+    }
+
+    private string EmitServerProgram(StringBuilder body)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("using System;");
+        sb.AppendLine("using System.IO;");
+        sb.AppendLine("using Microsoft.AspNetCore.Builder;");
+        sb.AppendLine("using Microsoft.AspNetCore.Http;");
+        sb.AppendLine();
+
+        // Emit function definitions and other code
+        sb.Append(body);
+        sb.AppendLine();
+
+        sb.AppendLine("var builder = WebApplication.CreateBuilder(args);");
+        sb.AppendLine("var app = builder.Build();");
+        sb.AppendLine();
+
+        EmitRouteRegistrations(sb);
+        sb.AppendLine();
+
+        sb.AppendLine($"Console.WriteLine(\"[SERVER] Listening on http://0.0.0.0:{_serverPort}\");");
+        sb.AppendLine($"app.Run(\"http://0.0.0.0:{_serverPort}\");");
+        return sb.ToString();
+    }
+
+    private void EmitRouteRegistrations(StringBuilder sb)
+    {
+        foreach (var (method, pattern, handler) in _routes)
+        {
+            var routePath = ConvertRoutePattern(pattern);
+            var func = _functions.FirstOrDefault(f => f.Name == handler);
+            if (func == default)
+            {
+                sb.AppendLine($"// WARNING: handler '{handler}' not found for {method} {pattern}");
+                continue;
+            }
+
+            var paramDecls = new List<string>();
+            bool hasBodyParam = false;
+            string? bodyParamName = null;
+
+            foreach (var (param, type) in func.Params)
+            {
+                bool isRouteParam = pattern.Contains($":{param}");
+                if (!isRouteParam && type is StrType && method == "Post")
+                {
+                    hasBodyParam = true;
+                    bodyParamName = param;
+                }
+                else
+                {
+                    paramDecls.Add($"{AgType.ToCSharp(type)} {param}");
+                }
+            }
+
+            string callArgs = string.Join(", ", func.Params.Select(p => p.Param));
+            string returnExpr = func.ReturnType is StrType
+                ? $"{handler}({callArgs})"
+                : $"{handler}({callArgs}).ToString()";
+
+            if (hasBodyParam)
+            {
+                sb.AppendLine($"app.Map{method}(\"{routePath}\", async ({string.Join(", ", paramDecls.Append("HttpContext _ctx"))}) => {{");
+                sb.AppendLine($"    using var _reader = new StreamReader(_ctx.Request.Body);");
+                sb.AppendLine($"    string {bodyParamName} = await _reader.ReadToEndAsync();");
+                sb.AppendLine($"    return {returnExpr};");
+                sb.AppendLine("});");
+            }
+            else
+            {
+                sb.AppendLine($"app.Map{method}(\"{routePath}\", ({string.Join(", ", paramDecls)}) => {returnExpr});");
+            }
+        }
+    }
+
+    private static string ConvertRoutePattern(string pattern)
+    {
+        return string.Join("/", pattern.Split('/').Select(seg =>
+            seg.StartsWith(":") ? $"{{{seg[1..]}}}" : seg));
     }
 
     private void TranspileNode(AstNode node, StringBuilder sb)
@@ -113,7 +212,7 @@ public sealed class Transpiler
                 var sig = TypeAnnotations.ParseDefun(list);
                 string fnName = TypeInferencePass.Sanitize(sig.Name);
                 _functions.Add((fnName, sig.Parameters.Select(p =>
-                    (TypeInferencePass.Sanitize(p.Param), p.Type)).ToList()));
+                    (TypeInferencePass.Sanitize(p.Param), p.Type)).ToList(), sig.ReturnType));
                 var paramStrs = sig.Parameters.Select(p =>
                     $"{AgType.ToCSharp(p.Type)} {TypeInferencePass.Sanitize(p.Param)}");
                 string retType = AgType.ToCSharp(sig.ReturnType);
@@ -143,6 +242,32 @@ public sealed class Transpiler
             case "assert-true":
             case "assert-near":
                 break;
+
+            case "server.get":
+            {
+                var route = ((AtomNode)list.Elements[1]).Token.Value;
+                var handler = TypeInferencePass.Sanitize(((AtomNode)list.Elements[2]).Token.Value);
+                _permissions.Require("http");
+                _routes.Add(("Get", route, handler));
+                break;
+            }
+
+            case "server.post":
+            {
+                var route = ((AtomNode)list.Elements[1]).Token.Value;
+                var handler = TypeInferencePass.Sanitize(((AtomNode)list.Elements[2]).Token.Value);
+                _permissions.Require("http");
+                _routes.Add(("Post", route, handler));
+                break;
+            }
+
+            case "server.listen":
+            {
+                _permissions.Require("http");
+                var portAtom = (AtomNode)list.Elements[1];
+                _serverPort = (int)double.Parse(portAtom.Token.Value);
+                break;
+            }
 
             case "require":
                 sb.AppendLine($"    if (!Convert.ToBoolean({TranspileExpression(list.Elements[1])})) throw new Exception(\"Contract violation: precondition failed\");");
@@ -285,10 +410,10 @@ public sealed class Transpiler
     /// </summary>
     private void EmitAutoEntryPoint(StringBuilder sb)
     {
-        if (_hasMainOutput || _functions.Count == 0)
+        if (_hasMainOutput || _functions.Count == 0 || _serverPort is not null)
             return;
 
-        var (name, parameters) = _functions[0];
+        var (name, parameters, _) = _functions[0];
 
         for (int i = 0; i < parameters.Count; i++)
         {
