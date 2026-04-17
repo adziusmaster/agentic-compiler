@@ -76,7 +76,13 @@ public sealed class Verifier
         {
             if (atom.Token.Type == TokenType.Number) return double.Parse(atom.Token.Value);
             if (atom.Token.Type == TokenType.String) return atom.Token.Value;
-            if (atom.Token.Type == TokenType.Identifier) return _env.Get(atom.Token.Value.Replace("-", "_"));
+            if (atom.Token.Type == TokenType.Identifier)
+            {
+                var id = atom.Token.Value.Replace("-", "_");
+                if (id is "true") return true;
+                if (id is "false") return false;
+                return _env.Get(id);
+            }
             return null;
         }
 
@@ -121,6 +127,9 @@ public sealed class Verifier
                 "ensure"      => ExecuteEnsure(list),
                 "try"         => ExecuteTryCatch(list),
                 "throw"       => throw new AgenticRuntimeException(Convert.ToString(Evaluate(list.Elements[1])) ?? "Unknown error"),
+
+                "true"  => true,
+                "false" => false,
 
                 _ => ExecuteFunctionCall(op, list)
             };
@@ -295,7 +304,7 @@ public sealed class Verifier
         var sig = TypeAnnotations.ParseDefun(funcDef);
         var frame = new Dictionary<string, object>();
         for (int i = 0; i < sig.Parameters.Count && i < args.Length; i++)
-            frame[sig.Parameters[i].Param] = args[i];
+            frame[sig.Parameters[i].Param.Replace("-", "_")] = args[i];
 
         _env.PushFrame(frame);
         try   { return Evaluate(sig.Body); }
@@ -336,7 +345,7 @@ public sealed class Verifier
 
         var frame = new Dictionary<string, object>();
         for (int i = 0; i < sig.Parameters.Count; i++)
-            frame[sig.Parameters[i].Param] = Evaluate(list.Elements[i + 1])!;
+            frame[sig.Parameters[i].Param.Replace("-", "_")] = Evaluate(list.Elements[i + 1])!;
 
         bool isImported = _importedAll.Contains(name);
         if (isImported) _importedCallDepth++;

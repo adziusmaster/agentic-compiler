@@ -253,9 +253,14 @@ public sealed class Transpiler
                     $"{AgType.ToCSharp(p.Type)} {TypeInferencePass.Sanitize(p.Param)}");
                 string retType = AgType.ToCSharp(sig.ReturnType);
                 sb.AppendLine($"    {retType} {fnName}({string.Join(", ", paramStrs)}) {{");
-                TranspileNode(sig.Body, sb);
-                if (!ContainsReturn(sig.Body))
-                    sb.AppendLine($"      return default({retType})!;");
+                if (ContainsReturn(sig.Body))
+                {
+                    TranspileNode(sig.Body, sb);
+                }
+                else
+                {
+                    EmitImplicitReturn(sig.Body, sb);
+                }
                 sb.AppendLine("    }");
                 break;
             }
@@ -446,6 +451,9 @@ public sealed class Transpiler
         if (_types.Structs.TryResolveOp(op, out var typeName, out var member))
             return EmitStructOp(typeName, member, list);
 
+        // Boolean literals used as expressions (e.g. LLM writes `(true)`)
+        if (op is "true" or "false") return op;
+
         var callArgs = list.Elements.Skip(1).Select(TranspileExpression);
         return $"{TypeInferencePass.Sanitize(op)}({string.Join(", ", callArgs)})";
     }
@@ -498,6 +506,43 @@ public sealed class Transpiler
             sb.AppendLine($"    var {name} = {TranspileExpression(rhs)};");
         else
             sb.AppendLine($"    {name} = {TranspileExpression(rhs)};");
+    }
+
+    /// <summary>
+    /// Emits a function body with an implicit return on the last expression.
+    /// For <c>(do ...)</c> blocks, all but the last element are emitted as statements
+    /// and the last element is returned. For single expressions, emits <c>return expr;</c>.
+    /// </summary>
+    private void EmitImplicitReturn(AstNode body, StringBuilder sb)
+    {
+        if (body is ListNode list && list.Elements.Count > 0)
+        {
+            var op = (list.Elements[0] as AtomNode)?.Token.Value;
+            if (op == "do")
+            {
+                // Emit all but the last element as statements, return the last
+                for (int i = 1; i < list.Elements.Count - 1; i++)
+                    TranspileNode(list.Elements[i], sb);
+                if (list.Elements.Count > 1)
+                    EmitImplicitReturn(list.Elements[^1], sb);
+                return;
+            }
+            if (op is "if" && !ContainsReturn(body))
+            {
+                // if without returns — emit as statement-if with implicit returns in each branch
+                sb.AppendLine($"    if ({TranspileExpression(list.Elements[1])}) {{");
+                EmitImplicitReturn(list.Elements[2], sb);
+                if (list.Elements.Count > 3)
+                {
+                    sb.AppendLine("} else {");
+                    EmitImplicitReturn(list.Elements[3], sb);
+                }
+                sb.AppendLine("}");
+                return;
+            }
+        }
+        // Single expression — emit as return
+        sb.AppendLine($"      return {TranspileExpression(body)};");
     }
 
     /// <summary>

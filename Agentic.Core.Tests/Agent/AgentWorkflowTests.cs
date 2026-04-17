@@ -1,5 +1,6 @@
 using Agentic.Core.Agent;
 using Agentic.Core.Execution;
+using Agentic.Core.Stdlib;
 using FluentAssertions;
 using NSubstitute;
 using Xunit;
@@ -298,6 +299,91 @@ public class AgentWorkflowTests
 
         result.Success.Should().BeTrue();
         result.Source.Should().StartWith("(do");
+    }
+
+    #endregion
+
+    #region Permission Inference
+
+    [Theory]
+    [InlineData("Build an API endpoint that returns user data")]
+    [InlineData("Create a REST server with product routes")]
+    [InlineData("Build an http service that listens on port 8080")]
+    [InlineData("Create a webhook handler")]
+    [InlineData("Fetch data from a URL")]
+    public void InferPermissions_DetectsHttpFromIntent(string intent)
+    {
+        var perms = AgentWorkflow.InferPermissions(intent);
+        perms.AllowHttp.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("Build a calculator")]
+    [InlineData("Sort an array of numbers")]
+    [InlineData("Compute standard deviation")]
+    public void InferPermissions_NoHttpForPureComputation(string intent)
+    {
+        var perms = AgentWorkflow.InferPermissions(intent);
+        perms.AllowHttp.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("Read file contents and parse them")]
+    [InlineData("Load file data from disk")]
+    [InlineData("Parse a CSV file")]
+    public void InferPermissions_DetectsFileReadFromIntent(string intent)
+    {
+        var perms = AgentWorkflow.InferPermissions(intent);
+        perms.AllowFileRead.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("Write results to a file")]
+    [InlineData("Save file output as report")]
+    public void InferPermissions_DetectsFileWriteFromIntent(string intent)
+    {
+        var perms = AgentWorkflow.InferPermissions(intent);
+        perms.AllowFileWrite.Should().BeTrue();
+        perms.AllowFileRead.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("Read the API key from an environment variable")]
+    [InlineData("Get config from env vars")]
+    public void InferPermissions_DetectsEnvFromIntent(string intent)
+    {
+        var perms = AgentWorkflow.InferPermissions(intent);
+        perms.AllowEnv.Should().BeTrue();
+    }
+
+    [Fact]
+    public void MergePermissions_CombinesBothSets()
+    {
+        var a = new Permissions { AllowHttp = true };
+        var b = new Permissions { AllowFileRead = true, AllowEnv = true };
+
+        var merged = AgentWorkflow.MergePermissions(a, b);
+
+        merged.AllowHttp.Should().BeTrue();
+        merged.AllowFileRead.Should().BeTrue();
+        merged.AllowEnv.Should().BeTrue();
+        merged.AllowFileWrite.Should().BeFalse();
+    }
+
+    [Fact]
+    public void BuildInitialPrompt_ServerAppOmitsSysInputGet()
+    {
+        var prompt = AgentWorkflow.BuildInitialPrompt("Build an API endpoint", "Api");
+        prompt.Should().Contain("server.listen");
+        prompt.Should().Contain("Do NOT use (sys.input.get");
+    }
+
+    [Fact]
+    public void BuildInitialPrompt_RegularAppIncludesSysInputGet()
+    {
+        var prompt = AgentWorkflow.BuildInitialPrompt("Add two numbers", "Calc");
+        prompt.Should().Contain("sys.input.get");
+        prompt.Should().NotContain("server.listen");
     }
 
     #endregion

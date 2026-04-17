@@ -32,7 +32,8 @@ switch (command)
             await RunIntentAgent(string.Join(' ', args.Skip(1).TakeWhile(a => !a.StartsWith("--"))),
                 emitBinary: !args.Contains("--check"),
                 outputFormat: args.Contains("--json") ? "json" : "sexpr",
-                outputName: ParseOption(args, "--out"));
+                outputName: ParseOption(args, "--out"),
+                explicitPermissions: ParsePermissions(args));
         break;
 
     default:
@@ -209,7 +210,7 @@ static async Task RunLegacyAgent(string filePath)
     }
 }
 
-static async Task RunIntentAgent(string intent, bool emitBinary, string outputFormat, string? outputName = null)
+static async Task RunIntentAgent(string intent, bool emitBinary, string outputFormat, string? outputName = null, Permissions? explicitPermissions = null)
 {
     if (string.IsNullOrWhiteSpace(intent))
     {
@@ -226,8 +227,19 @@ static async Task RunIntentAgent(string intent, bool emitBinary, string outputFo
 
     string moduleName = outputName ?? "Program";
 
+    var inferred = AgentWorkflow.InferPermissions(intent);
+    var permissions = AgentWorkflow.MergePermissions(explicitPermissions ?? Permissions.None, inferred);
+
+    var autoGranted = new List<string>();
+    if (inferred.AllowHttp && !(explicitPermissions?.AllowHttp ?? false)) autoGranted.Add("http");
+    if (inferred.AllowFileRead && !(explicitPermissions?.AllowFileRead ?? false)) autoGranted.Add("file-read");
+    if (inferred.AllowFileWrite && !(explicitPermissions?.AllowFileWrite ?? false)) autoGranted.Add("file-write");
+    if (inferred.AllowEnv && !(explicitPermissions?.AllowEnv ?? false)) autoGranted.Add("env");
+    if (autoGranted.Count > 0)
+        Console.WriteLine($"[PERMISSIONS] Auto-granted from intent: {string.Join(", ", autoGranted)}");
+
     IAgentClient agent = new AgentClient(apiKey);
-    var workflow = new AgentWorkflow(agent, maxAttempts: 3, emitBinary: emitBinary, log: Console.WriteLine);
+    var workflow = new AgentWorkflow(agent, maxAttempts: 5, emitBinary: emitBinary, permissions: permissions, log: Console.WriteLine);
 
     Console.WriteLine($"[INTENT] {intent}\n");
 
@@ -242,7 +254,6 @@ static async Task RunIntentAgent(string intent, bool emitBinary, string outputFo
         File.WriteAllText(savePath, result.Source);
         Console.WriteLine($"[SAVED] Source: {savePath}");
 
-        // Show generated C# source
         if (result.CompileResult?.GeneratedSource is not null)
         {
             Console.WriteLine("\n[GENERATED C#]");

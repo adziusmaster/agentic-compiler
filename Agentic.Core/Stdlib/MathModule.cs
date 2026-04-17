@@ -3,6 +3,8 @@ namespace Agentic.Core.Stdlib;
 /// <summary>Math operations and LLM-hallucinated C# stdlib aliases.</summary>
 public sealed class MathModule : IStdlibModule
 {
+    private static readonly Random _rng = new();
+
     public void Register(StdlibRegistry registry)
     {
         registry.VerifierFuncs["math.sin"]   = a => Math.Sin(D(a[0]));
@@ -16,6 +18,7 @@ public sealed class MathModule : IStdlibModule
         registry.VerifierFuncs["math.min"]   = a => Math.Min(D(a[0]), D(a[1]));
         registry.VerifierFuncs["math.max"]   = a => Math.Max(D(a[0]), D(a[1]));
         registry.VerifierFuncs["math.mod"]   = a => D(a[0]) % D(a[1]);
+        registry.VerifierFuncs["math.random"] = _ => _rng.NextDouble();
 
         registry.VerifierFuncs["double.Parse"] = a => Convert.ToDouble(a[0]);
         registry.VerifierFuncs["double.parse"] = a => Convert.ToDouble(a[0]);
@@ -23,7 +26,7 @@ public sealed class MathModule : IStdlibModule
         registry.VerifierFuncs["int.parse"]    = a => (double)Convert.ToInt32(a[0]);
 
         registry.TranspilerEmitters["math.mod"] = (a, r) => $"({r(a[0])} % {r(a[1])})";
-
+        registry.TranspilerEmitters["math.random"] = (_, _) => "new Random().NextDouble()";
         var directMap = new Dictionary<string, string>
         {
             ["math.sin"]   = "Math.Sin",

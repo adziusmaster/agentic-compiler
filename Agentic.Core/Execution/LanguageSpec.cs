@@ -126,6 +126,7 @@ Explicit type annotation: `(def m : (Map Str Num) (map.new))`.
 ## Math Library (import std.math)
 Unary: `math.sin`, `math.cos`, `math.abs`, `math.sqrt`, `math.floor`, `math.ceil`, `math.log`.
 Binary: `math.pow`, `math.mod`, `math.min`, `math.max`.
+Zero-arg: `(math.random)` — returns a random double in [0, 1).
 
 ## I/O
 ```

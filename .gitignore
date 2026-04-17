@@ -53,5 +53,8 @@ CodeCoverage/
 TestResult.xml
 nunit-*.xml
 
+# Environment files
+.env
+
 # AG specific cache
 .agc-cache/
