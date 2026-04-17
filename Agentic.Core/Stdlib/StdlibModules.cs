@@ -6,7 +6,7 @@ namespace Agentic.Core.Stdlib;
 /// </summary>
 public static class StdlibModules
 {
-    public static IReadOnlyList<IStdlibModule> All { get; } =
+    private static IReadOnlyList<IStdlibModule> CreateModules() =>
     [
         new MathModule(),
         new StringModule(),
@@ -19,10 +19,14 @@ public static class StdlibModules
         new EnvModule(),
     ];
 
+    /// <summary>Shared module list for read-only use (verifier). Do NOT use for transpiler.</summary>
+    public static IReadOnlyList<IStdlibModule> All { get; } = CreateModules();
+
+    /// <summary>Creates a fresh registry with new module instances (resets transpiler state like counters).</summary>
     public static StdlibRegistry Build()
     {
         var registry = new StdlibRegistry();
-        foreach (var module in All)
+        foreach (var module in CreateModules())
             module.Register(registry);
         return registry;
     }

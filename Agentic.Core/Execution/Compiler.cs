@@ -197,12 +197,13 @@ public sealed class Compiler
         }
         catch (Exception ex)
         {
+            var detail = ex.InnerException != null ? $"{ex.Message} → {ex.InnerException.Message}" : ex.Message;
             diagnostics.Add(new CompileDiagnostic
             {
                 Severity = DiagnosticSeverity.Error,
                 Type = "transpile-error",
-                Message = ex.Message,
-                FixHint = "This is likely a compiler bug. Simplify the program and retry."
+                Message = detail,
+                FixHint = "The transpiler failed generating C#. Ensure all functions have explicit type annotations: (defun name ((param : Type)) : ReturnType ...)."
             });
             return new CompileResult
             {

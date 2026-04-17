@@ -16,4 +16,7 @@ public sealed class StdlibRegistry
 
     /// <summary>Maps function names to the permission capability they require (e.g. "file.read", "http").</summary>
     public Dictionary<string, string> PermissionRequirements { get; } = new();
+
+    /// <summary>When true, emitted code needs a static HttpClient field.</summary>
+    public bool RequiresHttpClient { get; set; }
 }

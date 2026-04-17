@@ -104,7 +104,21 @@ static void RunCompile(string filePath, bool emitBinary, string outputFormat, Pe
 
     if (!File.Exists(filePath))
     {
-        Console.WriteLine($"(error (type \"file-not-found\") (message \"File not found: {filePath}\"))");
+        var notFoundResult = new CompileResult
+        {
+            Success = false,
+            Diagnostics = new List<CompileDiagnostic>
+            {
+                new()
+                {
+                    Severity = DiagnosticSeverity.Error,
+                    Type = "file-not-found",
+                    Message = $"File not found: {filePath}",
+                    FixHint = "Check that the file path is correct and the file exists."
+                }
+            }
+        };
+        Console.WriteLine(outputFormat == "json" ? notFoundResult.ToJson() : notFoundResult.ToSExpr());
         return;
     }
 

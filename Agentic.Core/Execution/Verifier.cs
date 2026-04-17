@@ -83,7 +83,7 @@ public sealed class Verifier
                 "defstruct" => ExecuteDefStruct(list),
                 "return"    => throw new ReturnException(Evaluate(list.Elements[1])),
 
-                "arr.new"    => new double[Convert.ToInt32(Evaluate(RequireArg(list, 1, "arr.new <size>")))],
+                "arr.new"    => ExecuteArrayNew(list),
                 "arr.get"    => ExecuteArrayGet(list),
                 "arr.set"    => ExecuteArraySet(list),
                 "arr.length" => ExecuteArrayLength(list),
@@ -124,6 +124,19 @@ public sealed class Verifier
                 $"Got only {list.Elements.Count - 1} argument(s).");
         }
         return list.Elements[argIndex];
+    }
+    
+    private object ExecuteArrayNew(ListNode list)
+    {
+        var sizeVal = Evaluate(RequireArg(list, 1, "arr.new <size>"));
+        int size;
+        try { size = Convert.ToInt32(sizeVal); }
+        catch { throw new InvalidOperationException($"arr.new: size must be a valid integer, got {sizeVal}."); }
+        if (size < 0)
+            throw new InvalidOperationException($"arr.new: size must be non-negative, got {size}.");
+        if (size > 10_000_000)
+            throw new InvalidOperationException($"arr.new: size {size} exceeds maximum (10,000,000).");
+        return new double[size];
     }
 
     private object ExecuteArrayGet(ListNode list)
@@ -172,7 +185,9 @@ public sealed class Verifier
     private object ExecuteArrayMap(ListNode list)
     {
         var arr = Evaluate(RequireArg(list, 1, "arr.map <array> <func>"))!;
-        string fnName = ((AtomNode)list.Elements[2]).Token.Value;
+        if (list.Elements.Count < 3 || list.Elements[2] is not AtomNode fnAtom)
+            throw new InvalidOperationException("arr.map: second argument must be a function name.");
+        string fnName = fnAtom.Token.Value;
 
         if (arr is double[] darr)
         {
@@ -197,7 +212,9 @@ public sealed class Verifier
     private object ExecuteArrayFilter(ListNode list)
     {
         var arr = Evaluate(RequireArg(list, 1, "arr.filter <array> <func>"))!;
-        string fnName = ((AtomNode)list.Elements[2]).Token.Value;
+        if (list.Elements.Count < 3 || list.Elements[2] is not AtomNode fnAtom)
+            throw new InvalidOperationException("arr.filter: second argument must be a function name.");
+        string fnName = fnAtom.Token.Value;
 
         if (arr is double[] darr)
         {
@@ -224,7 +241,9 @@ public sealed class Verifier
     private object ExecuteArrayReduce(ListNode list)
     {
         var arr = Evaluate(RequireArg(list, 1, "arr.reduce <array> <func> <initial>"))!;
-        string fnName = ((AtomNode)list.Elements[2]).Token.Value;
+        if (list.Elements.Count < 3 || list.Elements[2] is not AtomNode fnAtom)
+            throw new InvalidOperationException("arr.reduce: second argument must be a function name.");
+        string fnName = fnAtom.Token.Value;
         var acc = Evaluate(RequireArg(list, 3, "arr.reduce <array> <func> <initial>"))!;
 
         if (arr is double[] darr)
@@ -280,9 +299,14 @@ public sealed class Verifier
             return ExecuteStructOp(typeName, member, list);
 
         if (!_env.TryGetFunction(name, out var funcDef))
-            throw new UnauthorizedAccessException($"CRITICAL: Function '{name}' not found in registry.");
+            throw new InvalidOperationException($"Function '{name}' is not defined. Check spelling or define it with (defun {name} ...).");
 
         var sig = TypeAnnotations.ParseDefun(funcDef);
+        int provided = list.Elements.Count - 1;
+        if (provided != sig.Parameters.Count)
+            throw new InvalidOperationException(
+                $"Arity error: '{name}' expects {sig.Parameters.Count} argument(s), got {provided}.");
+
         var frame = new Dictionary<string, object>();
         for (int i = 0; i < sig.Parameters.Count; i++)
             frame[sig.Parameters[i].Param] = Evaluate(list.Elements[i + 1])!;
@@ -342,6 +366,8 @@ public sealed class Verifier
     {
         double l = Convert.ToDouble(Evaluate(list.Elements[1]));
         double r = Convert.ToDouble(Evaluate(list.Elements[2]));
+        if (op == "/" && r == 0.0)
+            throw new InvalidOperationException("Division by zero: divisor is 0.");
         return op switch { "+" => l + r, "-" => l - r, "*" => l * r, "/" => l / r, _ => 0 };
     }
 
@@ -351,7 +377,8 @@ public sealed class Verifier
     {
         int idx = Convert.ToInt32(Evaluate(list.Elements[1]));
         if (idx < 0 || idx >= _inputs.Length)
-            return 0.0; // Default during verification when no CLI args provided
+            throw new InvalidOperationException(
+                $"OS Fault: Requested input index {idx}, but only {_inputs.Length} inputs provided.");
         return double.Parse(_inputs[idx]);
     }
 
@@ -359,7 +386,8 @@ public sealed class Verifier
     {
         int idx = Convert.ToInt32(Evaluate(list.Elements[1]));
         if (idx < 0 || idx >= _inputs.Length)
-            return ""; // Default during verification when no CLI args provided
+            throw new InvalidOperationException(
+                $"OS Fault: Requested input index {idx}, but only {_inputs.Length} inputs provided.");
         return _inputs[idx];
     }
 
@@ -401,7 +429,9 @@ public sealed class Verifier
 
     private object ExecuteStructOp(string typeName, string member, ListNode list)
     {
-        _env.Types.TryGet(typeName, out var type);
+        if (!_env.Types.TryGet(typeName, out var type))
+            throw new InvalidOperationException(
+                $"Type '{typeName}' is not defined. Define it with (defstruct {typeName} (...)).");
         var callArgs = list.Elements.Skip(1).Select(Evaluate).ToList();
 
         if (member == "new")
@@ -532,10 +562,11 @@ public sealed class Verifier
     /// </summary>
     private object? ExecuteRequire(ListNode list)
     {
-        var value = Evaluate(RequireArg(list, 1, "require <expr>"));
+        var condNode = RequireArg(list, 1, "require <expr>");
+        var value = Evaluate(condNode);
         if (!Convert.ToBoolean(value))
             throw new ContractViolationException("require",
-                $"precondition failed");
+                $"precondition failed: ({FormatCondition(condNode)}) evaluated to false");
         return null;
     }
 
@@ -544,12 +575,20 @@ public sealed class Verifier
     /// </summary>
     private object? ExecuteEnsure(ListNode list)
     {
-        var value = Evaluate(RequireArg(list, 1, "ensure <expr>"));
+        var condNode = RequireArg(list, 1, "ensure <expr>");
+        var value = Evaluate(condNode);
         if (!Convert.ToBoolean(value))
             throw new ContractViolationException("ensure",
-                $"postcondition failed");
+                $"postcondition failed: ({FormatCondition(condNode)}) evaluated to false");
         return null;
     }
+
+    private static string FormatCondition(AstNode node) => node switch
+    {
+        AtomNode a => a.Token.Value,
+        ListNode l => $"({string.Join(" ", l.Elements.Select(FormatCondition))})",
+        _ => "?"
+    };
 
     private static bool ValuesEqual(object? a, object? b)
     {
@@ -573,34 +612,31 @@ public sealed class Verifier
     /// </summary>
     private object? ExecuteTryCatch(ListNode list)
     {
+        if (list.Elements.Count < 3)
+            throw new InvalidOperationException("try: requires (try <expr> (catch <var> <handler>)).");
         var tryBody = list.Elements[1];
 
-        // Parse (catch err-var handler) clause
-        var catchClause = (ListNode)list.Elements[2];
-        var catchOp = ((AtomNode)catchClause.Elements[0]).Token.Value;
-        if (catchOp != "catch")
-            throw new InvalidOperationException("try: second argument must be (catch var handler)");
+        if (list.Elements[2] is not ListNode catchClause)
+            throw new InvalidOperationException("try: second argument must be (catch var handler).");
+        if (catchClause.Elements.Count < 3)
+            throw new InvalidOperationException("try: catch clause requires (catch <var> <handler>).");
 
-        string errVar = ((AtomNode)catchClause.Elements[1]).Token.Value;
+        var catchOp = (catchClause.Elements[0] as AtomNode)?.Token.Value;
+        if (catchOp != "catch")
+            throw new InvalidOperationException("try: second argument must be (catch var handler).");
+
+        if (catchClause.Elements[1] is not AtomNode errAtom)
+            throw new InvalidOperationException("try: catch variable must be an identifier.");
+        string errVar = errAtom.Token.Value;
         var handler = catchClause.Elements[2];
 
         try
         {
             return Evaluate(tryBody);
         }
-        catch (AgenticRuntimeException ex)
-        {
-            _env.PushFrame(new Dictionary<string, object> { [errVar] = ex.Message });
-            try   { return Evaluate(handler); }
-            finally { _env.PopFrame(); }
-        }
-        catch (ContractViolationException ex)
-        {
-            _env.PushFrame(new Dictionary<string, object> { [errVar] = ex.Message });
-            try   { return Evaluate(handler); }
-            finally { _env.PopFrame(); }
-        }
-        catch (InvalidOperationException ex)
+        catch (ReturnException) { throw; }
+        catch (TestFailureException) { throw; }
+        catch (Exception ex)
         {
             _env.PushFrame(new Dictionary<string, object> { [errVar] = ex.Message });
             try   { return Evaluate(handler); }

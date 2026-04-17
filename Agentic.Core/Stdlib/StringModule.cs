@@ -52,7 +52,12 @@ public sealed class StringModule : IStdlibModule
         registry.TranspilerEmitters["str.replace"] = (a, r) => $"{r(a[0])}.Replace({r(a[1])}, {r(a[2])})";
 
         // --- new: split / join ---
-        registry.VerifierFuncs["str.split"] = a => S(a[0]).Split(S(a[1]));
+        registry.VerifierFuncs["str.split"] = a =>
+        {
+            var sep = S(a[1]);
+            if (sep.Length == 0) throw new InvalidOperationException("str.split: separator cannot be empty.");
+            return S(a[0]).Split(sep);
+        };
         registry.VerifierFuncs["str.join"]  = a =>
         {
             var arr = (string[])a[0];

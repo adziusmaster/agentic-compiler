@@ -39,7 +39,7 @@ public sealed class NativeEmitter
             publishArgs = $"publish -c Release -r {rid} --self-contained true";
         }
 
-        var process = new Process
+        using var process = new Process
         {
             StartInfo = new ProcessStartInfo
             {

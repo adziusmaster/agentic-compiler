@@ -19,13 +19,16 @@ public sealed class HttpModule : IStdlibModule
                 "http.post: HTTP operations are not available during verification. " +
                 "Test your logic with mock data instead.");
 
-        // Transpiler side — emits HttpClient calls
+        // Transpiler side — emits HttpClient calls using a shared static instance
         registry.TranspilerEmitters["http.get"] = (args, r) =>
-            $"new System.Net.Http.HttpClient().GetStringAsync({r(args[0])}).Result";
+            $"_httpClient.GetStringAsync({r(args[0])}).Result";
 
         registry.TranspilerEmitters["http.post"] = (args, r) =>
-            $"new System.Net.Http.HttpClient().PostAsync({r(args[0])}, " +
+            $"_httpClient.PostAsync({r(args[0])}, " +
             $"new System.Net.Http.StringContent({r(args[1])})).Result.Content.ReadAsStringAsync().Result";
+
+        // Flag: emitted code needs a static HttpClient field
+        registry.RequiresHttpClient = true;
 
         // Permission requirements
         registry.PermissionRequirements["http.get"] = "http";

@@ -25,12 +25,15 @@ public sealed class Transpiler
     /// <summary>True after transpilation if the program uses server.listen.</summary>
     public bool IsServerMode => _serverPort is not null;
 
+    private readonly bool _requiresHttpClient;
+
     public Transpiler(Permissions? permissions = null)
     {
         var registry = StdlibModules.Build();
         _emitters = registry.TranspilerEmitters;
         _permissionReqs = registry.PermissionRequirements;
         _permissions = permissions ?? Permissions.None;
+        _requiresHttpClient = registry.RequiresHttpClient;
     }
 
     /// <summary>
@@ -68,6 +71,8 @@ public sealed class Transpiler
             sb.AppendLine($"public record struct {s.Name}({fieldList});");
         }
         sb.AppendLine("class Program {");
+        if (_requiresHttpClient)
+            sb.AppendLine("  static readonly System.Net.Http.HttpClient _httpClient = new();");
         sb.AppendLine("  static void Main(string[] args) {");
         sb.Append(body);
         EmitAutoEntryPoint(sb);
@@ -238,6 +243,14 @@ public sealed class Transpiler
                 sb.AppendLine($"    {TranspileExpression(list.Elements[1])}[(int){TranspileExpression(list.Elements[2])}] = {TranspileExpression(list.Elements[3])};");
                 break;
 
+            case "map.set":
+                sb.AppendLine($"    {TranspileExpression(list.Elements[1])}[{TranspileExpression(list.Elements[2])}] = {TranspileExpression(list.Elements[3])};");
+                break;
+
+            case "map.remove":
+                sb.AppendLine($"    {TranspileExpression(list.Elements[1])}.Remove({TranspileExpression(list.Elements[2])});");
+                break;
+
             case "defstruct":
                 break;
 
@@ -355,9 +368,15 @@ public sealed class Transpiler
             return $"({TranspileExpression(list.Elements[1])} == {TranspileExpression(list.Elements[2])})";
 
         if (op == "sys.input.get")
-            return $"Convert.ToDouble(args[(int)({TranspileExpression(list.Elements[1])})])";
+        {
+            var idx = TranspileExpression(list.Elements[1]);
+            return $"((int)({idx}) < args.Length ? Convert.ToDouble(args[(int)({idx})]) : throw new ArgumentException($\"Expected at least {{(int)({idx})+1}} argument(s), got {{args.Length}}\"))";
+        }
         if (op == "sys.input.get_str")
-            return $"args[(int)({TranspileExpression(list.Elements[1])})]";
+        {
+            var idx = TranspileExpression(list.Elements[1]);
+            return $"((int)({idx}) < args.Length ? args[(int)({idx})] : throw new ArgumentException($\"Expected at least {{(int)({idx})+1}} argument(s), got {{args.Length}}\"))";
+        }
         if (op == "arr.new")
             return $"new double[(int)({TranspileExpression(list.Elements[1])})]";
         if (op == "arr.get")
@@ -489,6 +508,9 @@ public sealed class Transpiler
             return;
 
         var (name, parameters, _) = _functions[0];
+
+        if (parameters.Count > 0)
+            sb.AppendLine($"    if (args.Length < {parameters.Count}) {{ Console.Error.WriteLine(\"Error: expected {parameters.Count} argument(s)\"); return; }}");
 
         for (int i = 0; i < parameters.Count; i++)
         {

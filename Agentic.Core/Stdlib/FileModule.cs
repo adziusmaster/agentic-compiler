@@ -59,16 +59,16 @@ public sealed class FileModule : IStdlibModule
             $"System.IO.File.ReadAllText({r(args[0])})";
 
         registry.TranspilerEmitters["file.write"] = (args, r) =>
-            $"{{ System.IO.File.WriteAllText({r(args[0])}, {r(args[1])}); }}";
+            $"System.IO.File.WriteAllText({r(args[0])}, {r(args[1])})";
 
         registry.TranspilerEmitters["file.append"] = (args, r) =>
-            $"{{ System.IO.File.AppendAllText({r(args[0])}, {r(args[1])}); }}";
+            $"System.IO.File.AppendAllText({r(args[0])}, {r(args[1])})";
 
         registry.TranspilerEmitters["file.exists"] = (args, r) =>
             $"(System.IO.File.Exists({r(args[0])}) ? 1.0 : 0.0)";
 
         registry.TranspilerEmitters["file.delete"] = (args, r) =>
-            $"{{ System.IO.File.Delete({r(args[0])}); }}";
+            $"System.IO.File.Delete({r(args[0])})";
 
         // Permission requirements
         registry.PermissionRequirements["file.read"] = "file.read";

@@ -1,4 +1,5 @@
 using Agentic.Core.Execution;
+using System.Linq;
 
 namespace Agentic.Core.Agent;
 
@@ -72,7 +73,11 @@ public sealed class AgentWorkflow
 
             if (lastResult.Success)
             {
-                _log?.Invoke($"[SUCCESS] Compiled on attempt {attempt}. Tests: {lastResult.TestsPassed}/{lastResult.TestsPassed + lastResult.TestsFailed}");
+                int totalTests = lastResult.TestsPassed + lastResult.TestsFailed;
+                string testStatus = totalTests == 0
+                    ? "No tests defined"
+                    : $"Tests: {lastResult.TestsPassed}/{totalTests}";
+                _log?.Invoke($"[SUCCESS] Compiled on attempt {attempt}. {testStatus}");
                 _log?.Invoke($"[SESSION] {session.ToSummary()}");
                 return new AgentWorkflowResult
                 {
@@ -84,7 +89,14 @@ public sealed class AgentWorkflow
                 };
             }
 
-            _log?.Invoke($"[RETRY] Compilation failed: {lastResult.Diagnostics[0].Message}");
+            var errors = lastResult.Diagnostics
+                .Where(d => d.Severity == DiagnosticSeverity.Error)
+                .Select(d => d.Message)
+                .ToList();
+            var errorSummary = errors.Count <= 1
+                ? errors.FirstOrDefault() ?? "Unknown error"
+                : string.Join("; ", errors);
+            _log?.Invoke($"[RETRY] Compilation failed: {errorSummary}");
         }
 
         _log?.Invoke($"[FAILED] All {_maxAttempts} attempts exhausted.");
