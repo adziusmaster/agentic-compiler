@@ -1,0 +1,56 @@
+(module HigherOrder
+  ;; Demonstrates arr.map, arr.filter, arr.reduce with named functions
+
+  (defun double ((x : Num)) : Num
+    (return (* x 2)))
+
+  (defun is_even ((x : Num)) : Num
+    (return (= (math.mod x 2) 0)))
+
+  (defun sum ((a : Num) (b : Num)) : Num
+    (return (+ a b)))
+
+  (defun square ((x : Num)) : Num
+    (return (* x x)))
+
+  (test map_double
+    (do
+      (def nums : (Array Num) (arr.new 4))
+      (arr.set nums 0 1) (arr.set nums 1 2)
+      (arr.set nums 2 3) (arr.set nums 3 4)
+      (def result : (Array Num) (arr.map nums double))
+      (assert-eq (arr.get result 0) 2)
+      (assert-eq (arr.get result 1) 4)
+      (assert-eq (arr.get result 2) 6)
+      (assert-eq (arr.get result 3) 8)))
+
+  (test filter_even
+    (do
+      (def nums : (Array Num) (arr.new 6))
+      (arr.set nums 0 1) (arr.set nums 1 2)
+      (arr.set nums 2 3) (arr.set nums 3 4)
+      (arr.set nums 4 5) (arr.set nums 5 6)
+      (def result : (Array Num) (arr.filter nums is_even))
+      (assert-eq (arr.length result) 3)
+      (assert-eq (arr.get result 0) 2)
+      (assert-eq (arr.get result 1) 4)
+      (assert-eq (arr.get result 2) 6)))
+
+  (test reduce_sum
+    (do
+      (def nums : (Array Num) (arr.new 4))
+      (arr.set nums 0 1) (arr.set nums 1 2)
+      (arr.set nums 2 3) (arr.set nums 3 4)
+      (assert-eq (arr.reduce nums sum 0) 10)))
+
+  ;; Pipeline: square each of 5 inputs, filter evens, sum them
+  (def data : (Array Num) (arr.new 5))
+  (def i : Num 0)
+  (while (< i 5)
+    (do
+      (arr.set data i (sys.input.get i))
+      (set i (+ i 1))))
+  (def squared : (Array Num) (arr.map data square))
+  (def evens : (Array Num) (arr.filter squared is_even))
+  (def total : Num (arr.reduce evens sum 0))
+  (sys.stdout.write (str.concat "sum_of_even_squares=" (str.from_num total))))

@@ -1,0 +1,30 @@
+(module TempConverter
+  ;; Celsius ↔ Fahrenheit converter
+
+  (defun c_to_f ((celsius : Num)) : Num
+    (return (+ (* celsius 1.8) 32)))
+
+  (defun f_to_c ((fahrenheit : Num)) : Num
+    (return (/ (- fahrenheit 32) 1.8)))
+
+  (test c_to_f
+    (assert-near (c_to_f 0) 32 0.001)
+    (assert-near (c_to_f 100) 212 0.001)
+    (assert-near (c_to_f 37) 98.6 0.001))
+
+  (test f_to_c
+    (assert-near (f_to_c 32) 0 0.001)
+    (assert-near (f_to_c 212) 100 0.001)
+    (assert-near (f_to_c 98.6) 37 0.001))
+
+  ;; Round-trip: convert should be reversible
+  (test round_trip
+    (assert-near (f_to_c (c_to_f 25)) 25 0.0001))
+
+  ;; Usage: TempConverter <celsius>
+  ;; Prints: <celsius>°C = <fahrenheit>°F
+  (def input_c : Num (sys.input.get 0))
+  (sys.stdout.write
+    (str.concat (str.from_num input_c)
+      (str.concat "C = "
+        (str.concat (str.from_num (c_to_f input_c)) "F")))))

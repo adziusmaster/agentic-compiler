@@ -1,0 +1,53 @@
+(module Contracts
+  ;; Demonstrates require/ensure contracts and try/catch error handling
+
+  (defun safe_divide ((a : Num) (b : Num)) : Num
+    (require (> (* b b) 0))
+    (return (/ a b)))
+
+  (defun factorial ((n : Num)) : Num
+    (require (>= n 0))
+    (if (< n 2) (return 1) 0)
+    (def result : Num 1)
+    (def i : Num 2)
+    (while (<= i n)
+      (do
+        (set result (* result i))
+        (set i (+ i 1))))
+    (return result))
+
+  (defun clamp ((val : Num) (lo : Num) (hi : Num)) : Num
+    (require (<= lo hi))
+    (if (< val lo) (return lo) 0)
+    (if (> val hi) (return hi) 0)
+    (return val))
+
+  (test safe_divide
+    (assert-eq (safe_divide 10 2) 5)
+    (assert-near (safe_divide 1 3) 0.333333 0.001))
+
+  (test divide_by_zero_caught
+    (try
+      (safe_divide 1 0)
+      (catch err (assert-true true))))
+
+  (test factorial
+    (assert-eq (factorial 0) 1)
+    (assert-eq (factorial 1) 1)
+    (assert-eq (factorial 5) 120)
+    (assert-eq (factorial 10) 3628800))
+
+  (test clamp
+    (assert-eq (clamp 5 0 10) 5)
+    (assert-eq (clamp -3 0 10) 0)
+    (assert-eq (clamp 15 0 10) 10))
+
+  ;; Usage: Contracts <numerator> <denominator>
+  (def a : Num (sys.input.get 0))
+  (def b : Num (sys.input.get 1))
+  (try
+    (sys.stdout.write (str.concat (str.from_num a)
+      (str.concat " / " (str.concat (str.from_num b)
+        (str.concat " = " (str.from_num (safe_divide a b)))))))
+    (catch err
+      (sys.stdout.write (str.concat "Error: " err)))))

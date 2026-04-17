@@ -132,6 +132,24 @@ static void RunCompile(string filePath, bool emitBinary, string outputFormat, Pe
     cache.Flush();
 
     Console.WriteLine(outputFormat == "json" ? fileResult.ToJson() : fileResult.ToSExpr());
+
+    // Show generated C# source
+    if (fileResult.GeneratedSource is not null)
+    {
+        Console.WriteLine("\n[GENERATED C#]");
+        Console.WriteLine("----------------------------------");
+        Console.WriteLine(fileResult.GeneratedSource);
+        Console.WriteLine("----------------------------------");
+    }
+
+    // Copy .ag source next to the binary
+    if (fileResult.Success && fileResult.BinaryPath is not null)
+    {
+        var binaryDir = Path.GetDirectoryName(fileResult.BinaryPath)!;
+        var agDestination = Path.Combine(binaryDir, Path.GetFileName(filePath));
+        File.Copy(filePath, agDestination, overwrite: true);
+        Console.WriteLine($"[SOURCE] {agDestination}");
+    }
 }
 
 static async Task RunLegacyAgent(string filePath)
@@ -223,6 +241,15 @@ static async Task RunIntentAgent(string intent, bool emitBinary, string outputFo
         var savePath = FindSafePath(moduleName);
         File.WriteAllText(savePath, result.Source);
         Console.WriteLine($"[SAVED] Source: {savePath}");
+
+        // Show generated C# source
+        if (result.CompileResult?.GeneratedSource is not null)
+        {
+            Console.WriteLine("\n[GENERATED C#]");
+            Console.WriteLine("----------------------------------");
+            Console.WriteLine(result.CompileResult.GeneratedSource);
+            Console.WriteLine("----------------------------------");
+        }
     }
 
     if (!result.Success && result.Source is not null)

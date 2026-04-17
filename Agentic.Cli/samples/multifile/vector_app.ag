@@ -1,0 +1,31 @@
+(module VectorApp
+  (import "./vector_lib.ag")
+
+  ;; Takes 4 CLI args: x1 y1 x2 y2
+  ;; Computes addition, dot product, and magnitudes
+
+  (def v1 : (Array Num) (arr.new 2))
+  (arr.set v1 0 (sys.input.get 0))
+  (arr.set v1 1 (sys.input.get 1))
+
+  (def v2 : (Array Num) (arr.new 2))
+  (arr.set v2 0 (sys.input.get 2))
+  (arr.set v2 1 (sys.input.get 3))
+
+  (def added : (Array Num) (vec_add v1 v2))
+  (def dot : Num (vec_dot v1 v2))
+  (def mag1 : Num (vec_magnitude v1))
+  (def mag2 : Num (vec_magnitude v2))
+
+  (test imports_work
+    (do
+      (def a : (Array Num) (arr.new 2))
+      (arr.set a 0 1) (arr.set a 1 0)
+      (assert-near (vec_magnitude a) 1 0.001)))
+
+  (sys.stdout.write
+    (str.concat "add=(" (str.concat (str.from_num (arr.get added 0))
+      (str.concat "," (str.concat (str.from_num (arr.get added 1))
+        (str.concat "),dot=" (str.concat (str.from_num dot)
+          (str.concat ",|v1|=" (str.concat (str.from_num mag1)
+            (str.concat ",|v2|=" (str.from_num mag2))))))))))))

@@ -1,0 +1,50 @@
+(module BubbleSort
+  ;; Classic bubble sort on a numeric array
+
+  (defun sort ((data : (Array Num)) (size : Num)) : (Array Num)
+    (def i : Num 0)
+    (while (< i (- size 1))
+      (do
+        (def j : Num 0)
+        (while (< j (- size (+ i 1)))
+          (do
+            (def a : Num (arr.get data j))
+            (def b : Num (arr.get data (+ j 1)))
+            (if (> a b)
+              (do
+                (arr.set data j b)
+                (arr.set data (+ j 1) a))
+              0)
+            (set j (+ j 1))))
+        (set i (+ i 1))))
+    (return data))
+
+  (test sort
+    (do
+      (def nums : (Array Num) (arr.new 5))
+      (arr.set nums 0 5)
+      (arr.set nums 1 3)
+      (arr.set nums 2 8)
+      (arr.set nums 3 1)
+      (arr.set nums 4 4)
+      (sort nums 5)
+      (assert-eq (arr.get nums 0) 1)
+      (assert-eq (arr.get nums 1) 3)
+      (assert-eq (arr.get nums 2) 4)
+      (assert-eq (arr.get nums 3) 5)
+      (assert-eq (arr.get nums 4) 8)))
+
+  ;; Sort 5 numbers from CLI args and print comma-separated
+  (def data : (Array Num) (arr.new 5))
+  (def idx : Num 0)
+  (while (< idx 5)
+    (do
+      (arr.set data idx (sys.input.get idx))
+      (set idx (+ idx 1))))
+  (sort data 5)
+  (set idx 0)
+  (while (< idx 5)
+    (do
+      (if (> idx 0) (sys.stdout.write ",") 0)
+      (sys.stdout.write (str.from_num (arr.get data idx)))
+      (set idx (+ idx 1)))))

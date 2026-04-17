@@ -1,0 +1,48 @@
+(module VectorLib
+  (import std.math)
+  (export vec_add vec_dot vec_magnitude vec_scale)
+
+  ;; 2D vector operations using 2-element arrays
+
+  (defun vec_add ((a : (Array Num)) (b : (Array Num))) : (Array Num)
+    (def result : (Array Num) (arr.new 2))
+    (arr.set result 0 (+ (arr.get a 0) (arr.get b 0)))
+    (arr.set result 1 (+ (arr.get a 1) (arr.get b 1)))
+    (return result))
+
+  (defun vec_dot ((a : (Array Num)) (b : (Array Num))) : Num
+    (return (+ (* (arr.get a 0) (arr.get b 0))
+               (* (arr.get a 1) (arr.get b 1)))))
+
+  (defun vec_magnitude ((v : (Array Num))) : Num
+    (return (math.sqrt (vec_dot v v))))
+
+  (defun vec_scale ((v : (Array Num)) (s : Num)) : (Array Num)
+    (def result : (Array Num) (arr.new 2))
+    (arr.set result 0 (* (arr.get v 0) s))
+    (arr.set result 1 (* (arr.get v 1) s))
+    (return result))
+
+  (test vec_add
+    (do
+      (def a : (Array Num) (arr.new 2))
+      (arr.set a 0 1) (arr.set a 1 2)
+      (def b : (Array Num) (arr.new 2))
+      (arr.set b 0 3) (arr.set b 1 4)
+      (def r : (Array Num) (vec_add a b))
+      (assert-eq (arr.get r 0) 4)
+      (assert-eq (arr.get r 1) 6)))
+
+  (test vec_dot
+    (do
+      (def a : (Array Num) (arr.new 2))
+      (arr.set a 0 1) (arr.set a 1 2)
+      (def b : (Array Num) (arr.new 2))
+      (arr.set b 0 3) (arr.set b 1 4)
+      (assert-eq (vec_dot a b) 11)))
+
+  (test vec_magnitude
+    (do
+      (def v : (Array Num) (arr.new 2))
+      (arr.set v 0 3) (arr.set v 1 4)
+      (assert-near (vec_magnitude v) 5 0.0001))))

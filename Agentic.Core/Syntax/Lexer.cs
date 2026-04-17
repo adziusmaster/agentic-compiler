@@ -43,6 +43,14 @@ public sealed class Lexer
                 continue;
             }
 
+            // Line comments: skip from ';' to end of line
+            if (current == ';')
+            {
+                while (Current != '\0' && Current != '\n')
+                    Advance();
+                continue;
+            }
+
             if (current == '(')
             {
                 tokens.Add(new Token(TokenType.OpenParen, "(", _line, _column));

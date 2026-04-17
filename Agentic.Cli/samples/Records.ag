@@ -1,0 +1,42 @@
+(module Records
+  (import std.math)
+  ;; 2D Point with distance calculation using defstruct
+
+  (defstruct Point (x y))
+
+  (defun distance ((p1 : Point) (p2 : Point)) : Num
+    (def dx : Num (- (Point.x p2) (Point.x p1)))
+    (def dy : Num (- (Point.y p2) (Point.y p1)))
+    (return (math.sqrt (+ (* dx dx) (* dy dy)))))
+
+  (defun midpoint_x ((p1 : Point) (p2 : Point)) : Num
+    (return (/ (+ (Point.x p1) (Point.x p2)) 2)))
+
+  (defun midpoint_y ((p1 : Point) (p2 : Point)) : Num
+    (return (/ (+ (Point.y p1) (Point.y p2)) 2)))
+
+  (test distance
+    (do
+      (def a : Point (Point.new 0 0))
+      (def b : Point (Point.new 3 4))
+      (assert-near (distance a b) 5 0.0001)))
+
+  (test distance_same_point
+    (do
+      (def a : Point (Point.new 5 5))
+      (assert-near (distance a a) 0 0.0001)))
+
+  (test midpoint
+    (do
+      (def a : Point (Point.new 0 0))
+      (def b : Point (Point.new 10 10))
+      (assert-eq (midpoint_x a b) 5)
+      (assert-eq (midpoint_y a b) 5)))
+
+  ;; Usage: Records <x1> <y1> <x2> <y2>
+  (def p1 : Point (Point.new (sys.input.get 0) (sys.input.get 1)))
+  (def p2 : Point (Point.new (sys.input.get 2) (sys.input.get 3)))
+  (sys.stdout.write
+    (str.concat "distance=" (str.concat (str.from_num (distance p1 p2))
+      (str.concat ",midpoint=(" (str.concat (str.from_num (midpoint_x p1 p2))
+        (str.concat "," (str.concat (str.from_num (midpoint_y p1 p2)) ")"))))))))

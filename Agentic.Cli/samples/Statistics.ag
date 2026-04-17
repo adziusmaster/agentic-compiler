@@ -1,0 +1,91 @@
+(module Statistics
+  (import std.math)
+
+  ;; Mean of an array
+  (defun mean ((data : (Array Num)) (n : Num)) : Num
+    (require (> n 0))
+    (def sum : Num 0)
+    (def i : Num 0)
+    (while (< i n)
+      (do
+        (set sum (+ sum (arr.get data i)))
+        (set i (+ i 1))))
+    (return (/ sum n)))
+
+  ;; Variance (population)
+  (defun variance ((data : (Array Num)) (n : Num)) : Num
+    (require (> n 0))
+    (def avg : Num (mean data n))
+    (def sum_sq : Num 0)
+    (def i : Num 0)
+    (while (< i n)
+      (do
+        (def diff : Num (- (arr.get data i) avg))
+        (set sum_sq (+ sum_sq (* diff diff)))
+        (set i (+ i 1))))
+    (return (/ sum_sq n)))
+
+  ;; Standard deviation
+  (defun stddev ((data : (Array Num)) (n : Num)) : Num
+    (return (math.sqrt (variance data n))))
+
+  ;; Min and max
+  (defun find_min ((data : (Array Num)) (n : Num)) : Num
+    (require (> n 0))
+    (def result : Num (arr.get data 0))
+    (def i : Num 1)
+    (while (< i n)
+      (do
+        (def val : Num (arr.get data i))
+        (if (< val result) (set result val) 0)
+        (set i (+ i 1))))
+    (return result))
+
+  (defun find_max ((data : (Array Num)) (n : Num)) : Num
+    (require (> n 0))
+    (def result : Num (arr.get data 0))
+    (def i : Num 1)
+    (while (< i n)
+      (do
+        (def val : Num (arr.get data i))
+        (if (> val result) (set result val) 0)
+        (set i (+ i 1))))
+    (return result))
+
+  (test mean
+    (do
+      (def d : (Array Num) (arr.new 4))
+      (arr.set d 0 2) (arr.set d 1 4) (arr.set d 2 6) (arr.set d 3 8)
+      (assert-near (mean d 4) 5 0.001)))
+
+  (test variance
+    (do
+      (def d : (Array Num) (arr.new 4))
+      (arr.set d 0 2) (arr.set d 1 4) (arr.set d 2 6) (arr.set d 3 8)
+      (assert-near (variance d 4) 5 0.001)))
+
+  (test stddev
+    (do
+      (def d : (Array Num) (arr.new 4))
+      (arr.set d 0 2) (arr.set d 1 4) (arr.set d 2 6) (arr.set d 3 8)
+      (assert-near (stddev d 4) 2.2360679 0.0001)))
+
+  (test find_min_max
+    (do
+      (def d : (Array Num) (arr.new 5))
+      (arr.set d 0 7) (arr.set d 1 2) (arr.set d 2 9) (arr.set d 3 1) (arr.set d 4 5)
+      (assert-eq (find_min d 5) 1)
+      (assert-eq (find_max d 5) 9)))
+
+  ;; Usage: Statistics <n1> <n2> <n3> <n4> <n5>
+  (def data : (Array Num) (arr.new 5))
+  (def idx : Num 0)
+  (while (< idx 5)
+    (do
+      (arr.set data idx (sys.input.get idx))
+      (set idx (+ idx 1))))
+  (sys.stdout.write
+    (str.concat "mean=" (str.concat (str.from_num (mean data 5))
+      (str.concat ",stddev=" (str.concat (str.from_num (stddev data 5))
+        (str.concat ",min=" (str.concat (str.from_num (find_min data 5))
+          (str.concat ",max=" (str.from_num (find_max data 5)))))))))))

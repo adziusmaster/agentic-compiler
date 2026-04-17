@@ -1,0 +1,28 @@
+(module Fibonacci
+  ;; Compute the Nth Fibonacci number iteratively
+
+  (defun fib ((n : Num)) : Num
+    (require (>= n 0))
+    (if (< n 2)
+      (return n)
+      0)
+    (def prev : Num 0)
+    (def curr : Num 1)
+    (def i : Num 2)
+    (while (<= i n)
+      (do
+        (def next : Num (+ prev curr))
+        (set prev curr)
+        (set curr next)
+        (set i (+ i 1))))
+    (return curr))
+
+  (test fib
+    (assert-eq (fib 0) 0)
+    (assert-eq (fib 1) 1)
+    (assert-eq (fib 6) 8)
+    (assert-eq (fib 10) 55)
+    (assert-eq (fib 20) 6765))
+
+  ;; Print fib of first CLI argument
+  (sys.stdout.write (str.from_num (fib (sys.input.get 0)))))
