@@ -19,4 +19,7 @@ public sealed class StdlibRegistry
 
     /// <summary>When true, emitted code needs a static HttpClient field.</summary>
     public bool RequiresHttpClient { get; set; }
+
+    /// <summary>When true, emitted code needs Microsoft.Data.Sqlite helpers.</summary>
+    public bool RequiresSqlite { get; set; }
 }

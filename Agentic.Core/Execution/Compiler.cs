@@ -159,19 +159,28 @@ public sealed class Compiler
         catch (Exception ex) when (ex is not ReturnException)
         {
             testsPassed = verifier.TestsPassed;
-            diagnostics.Add(new CompileDiagnostic
+
+            bool isInputFault = ex.Message.StartsWith("OS Fault:");
+            if (isInputFault && testsFailed == 0)
             {
-                Severity = DiagnosticSeverity.Error,
-                Type = "runtime-error",
-                Message = ex.Message,
-                FixHint = "Review the expression that caused this runtime error."
-            });
-            return new CompileResult
+                // Fall through to transpile — main body is not under test
+            }
+            else
             {
-                Success = false,
-                TestsPassed = testsPassed,
-                Diagnostics = diagnostics
-            };
+                diagnostics.Add(new CompileDiagnostic
+                {
+                    Severity = DiagnosticSeverity.Error,
+                    Type = "runtime-error",
+                    Message = ex.Message,
+                    FixHint = "Review the expression that caused this runtime error."
+                });
+                return new CompileResult
+                {
+                    Success = false,
+                    TestsPassed = testsPassed,
+                    Diagnostics = diagnostics
+                };
+            }
         }
 
         string csharp;

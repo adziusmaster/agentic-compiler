@@ -1,0 +1,82 @@
+(module UserApi
+  (import std.db)
+  (import std.json)
+  (import std.string)
+
+  (defun create-user-in-db ((id : Str) (name : Str)) : Str
+    (do
+      (require (> (str.length id) 0) "User ID cannot be empty")
+      (require (> (str.length name) 0) "User name cannot be empty")
+      (db.insert "users" "id" id "name" name)
+      (json.object "status" "success" "id" id "name" name)))
+
+  (defun get-user-from-db ((id : Str)) : Str
+    (do
+      (require (> (str.length id) 0) "User ID cannot be empty")
+      (def rows (db.find-by "users" "id" id))
+      (if (= (db.row.count rows) 1)
+        (json.object "id" (db.row.get rows 0 "id") "name" (db.row.get rows 0 "name"))
+        (json.object "error" "User not found"))))
+
+  (defun update-user-in-db ((id : Str) (new-name : Str)) : Str
+    (do
+      (require (> (str.length id) 0) "User ID cannot be empty")
+      (require (> (str.length new-name) 0) "New name cannot be empty")
+      (db.update "users" "id" id "name" new-name)
+      (json.object "status" "success" "id" id "name" new-name)))
+
+  (defun delete-user-from-db ((id : Str)) : Str
+    (do
+      (require (> (str.length id) 0) "User ID cannot be empty")
+      (db.delete "users" "id" id)
+      (json.object "status" "success" "id" id)))
+
+  (defun handle-create-user ((body : Str)) : Str
+    (do
+      (def user-id (json.get body "id"))
+      (def user-name (json.get body "name"))
+      (if (or (str.eq user-id "") (str.eq user-name ""))
+        (json.object "error" "ID and name are required")
+        (create-user-in-db user-id user-name))))
+
+  (defun handle-get-user ((id : Str)) : Str
+    (get-user-from-db id))
+
+  (defun handle-update-user ((id : Str) (body : Str)) : Str
+    (do
+      (def new-name (json.get body "name"))
+      (if (str.eq new-name "")
+        (json.object "error" "New name is required")
+        (update-user-in-db id new-name))))
+
+  (defun handle-delete-user ((id : Str)) : Str
+    (delete-user-from-db id))
+
+  (test user-db-operations
+    (assert-eq (create-user-in-db "user1" "Alice") (json.object "status" "success" "id" "user1" "name" "Alice"))
+    (assert-eq (create-user-in-db "user2" "Bob") (json.object "status" "success" "id" "user2" "name" "Bob"))
+
+    (assert-eq (get-user-from-db "user1") (json.object "id" "user1" "name" "Alice"))
+    (assert-eq (get-user-from-db "user3") (json.object "error" "User not found"))
+
+    (assert-eq (update-user-in-db "user1" "Alicia") (json.object "status" "success" "id" "user1" "name" "Alicia"))
+    (assert-eq (get-user-from-db "user1") (json.object "id" "user1" "name" "Alicia"))
+
+    (assert-eq (delete-user-from-db "user2") (json.object "status" "success" "id" "user2"))
+    (assert-eq (get-user-from-db "user2") (json.object "error" "User not found"))
+
+    (assert-eq (handle-create-user (json.object "id" "" "name" "Test")) (json.object "error" "ID and name are required"))
+    (assert-eq (handle-create-user (json.object "id" "test3" "name" "")) (json.object "error" "ID and name are required"))
+    (assert-eq (handle-update-user "user1" (json.object "name" "")) (json.object "error" "New name is required"))
+  )
+
+  (do
+    (db.connect "users.sqlite")
+    (db.exec "CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, name TEXT)")
+
+    (server.json_post "/users" handle-create-user)
+    (server.json_get "/users/:id" handle-get-user)
+    (server.json_post "/users/:id" handle-update-user)
+    (server.json_post "/users/:id/delete" handle-delete-user)
+
+    (server.listen 8080)))

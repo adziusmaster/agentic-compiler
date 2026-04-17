@@ -18,6 +18,9 @@ public sealed record Permissions
     /// <summary>Allow reading environment variables.</summary>
     public bool AllowEnv { get; init; }
 
+    /// <summary>Allow SQLite database operations.</summary>
+    public bool AllowDb { get; init; }
+
     /// <summary>No permissions — pure computation only (default).</summary>
     public static Permissions None => new();
 
@@ -27,7 +30,8 @@ public sealed record Permissions
         AllowFileRead = true,
         AllowFileWrite = true,
         AllowHttp = true,
-        AllowEnv = true
+        AllowEnv = true,
+        AllowDb = true,
     };
 
     /// <summary>
@@ -41,6 +45,7 @@ public sealed record Permissions
             "file.write" => AllowFileWrite,
             "http"       => AllowHttp,
             "env"        => AllowEnv,
+            "db"         => AllowDb,
             _            => throw new ArgumentException($"Unknown capability: {capability}")
         };
 

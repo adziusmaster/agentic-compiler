@@ -17,6 +17,7 @@ public static class StdlibModules
         new ServerModule(),
         new HashMapModule(),
         new EnvModule(),
+        new DbModule(),
     ];
 
     /// <summary>Shared module list for read-only use (verifier). Do NOT use for transpiler.</summary>

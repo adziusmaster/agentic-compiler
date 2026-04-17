@@ -1,0 +1,93 @@
+;; TodoDb.ag — SQLite-backed todo list (CLI: add / list / done / delete)
+;; Usage:
+;;   TodoDb add "Buy milk"
+;;   TodoDb list
+;;   TodoDb done 1
+;;   TodoDb delete 1
+
+(module TodoDb
+  (import std.db)
+  (import std.string)
+
+  ;; ── Schema ──────────────────────────────────────────────────────────────────
+
+  (defun init-db () : Num
+    (do
+      (db.connect "todos.sqlite")
+      (db.exec "CREATE TABLE IF NOT EXISTS todos (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0)")
+      0))
+
+  ;; ── Commands ─────────────────────────────────────────────────────────────────
+
+  (defun cmd-add ((title : Str)) : Str
+    (do
+      (db.insert "todos" "title" title "done" 0)
+      (str.concat "Added: " title)))
+
+  (defun cmd-list () : Str
+    (do
+      (def rows (db.find-all "todos"))
+      (def n : Num (db.row.count rows))
+      (def i : Num 0)
+      (def out : Str "")
+      (while (< i n)
+        (do
+          (def title (db.row.get rows i "title"))
+          (def done  (db.row.get rows i "done"))
+          (def status (if (str.eq done "1") "[x]" "[ ]"))
+          (def id    (db.row.get rows i "id"))
+          (set out (str.concat out (str.concat id (str.concat ". " (str.concat status (str.concat " " (str.concat title "\n")))))))
+          (set i (+ i 1))))
+      (if (str.eq out "") "No todos yet.\n" out)))
+
+  (defun cmd-done ((id : Str)) : Str
+    (do
+      (db.update "todos" "id" id "done" 1)
+      (str.concat "Marked done: #" id)))
+
+  (defun cmd-delete ((id : Str)) : Str
+    (do
+      (db.delete "todos" "id" id)
+      (str.concat "Deleted: #" id)))
+
+  ;; ── Tests ────────────────────────────────────────────────────────────────────
+
+  (test add-and-list
+    (do
+      (db.insert "todos" "title" "Buy milk" "done" 0)
+      (db.insert "todos" "title" "Read book" "done" 0)
+      (def rows (db.find-all "todos"))
+      (assert-eq (db.row.count rows) 2)
+      (assert-eq (db.row.get rows 0 "title") "Buy milk")
+      (assert-eq (db.row.get rows 1 "title") "Read book")))
+
+  (test find-by-column
+    (do
+      (db.insert "todos" "title" "Walk dog" "done" 0)
+      (db.insert "todos" "title" "Write code" "done" 1)
+      (def done-rows (db.find-by "todos" "done" 1))
+      (assert-eq (db.row.count done-rows) 1)
+      (assert-eq (db.row.get done-rows 0 "title") "Write code")))
+
+  (test delete-todo
+    (do
+      (db.insert "todos" "id" "99" "title" "Temp" "done" 0)
+      (db.delete "todos" "id" "99")
+      (def rows (db.find-by "todos" "id" "99"))
+      (assert-eq (db.row.count rows) 0)))
+
+  ;; ── Entry point ───────────────────────────────────────────────────────────────
+
+  (do
+    (init-db)
+    (def cmd (sys.input.get_str 0))
+    (if (str.eq cmd "add")
+      (sys.stdout.write (cmd-add (sys.input.get_str 1)))
+      (if (str.eq cmd "list")
+        (sys.stdout.write (cmd-list))
+        (if (str.eq cmd "done")
+          (sys.stdout.write (cmd-done (sys.input.get_str 1)))
+          (if (str.eq cmd "delete")
+            (sys.stdout.write (cmd-delete (sys.input.get_str 1)))
+            (sys.stdout.write "Usage: TodoDb [add <title> | list | done <id> | delete <id>]\n")))))))
+)

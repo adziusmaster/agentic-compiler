@@ -171,5 +171,17 @@ internal sealed class TypeInferencePass
         return AgType.Unknown;
     }
 
-    internal static string Sanitize(string name) => name.Replace("-", "_");
+    internal static string Sanitize(string name)
+    {
+        var sanitized = name.Replace("-", "_");
+        return sanitized switch
+        {
+            "out" or "in" or "ref" or "base" or "class" or "event" or "object"
+            or "string" or "double" or "int" or "bool" or "var" or "void"
+            or "new" or "return" or "if" or "else" or "while" or "for"
+            or "do" or "lock" or "checked" or "unchecked" or "fixed"
+            => "@" + sanitized,
+            _ => sanitized
+        };
+    }
 }

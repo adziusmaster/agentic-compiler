@@ -22,7 +22,8 @@ public sealed class NativeEmitter
         string csprojPath = Path.Combine(_workspacePath, $"{outputName}.csproj");
 
         File.WriteAllText(csFilePath, transpiledCode);
-        File.WriteAllText(csprojPath, isServer ? GenerateWebCsproj() : GenerateCsproj());
+        bool usesSqlite = transpiledCode.Contains("Microsoft.Data.Sqlite") || transpiledCode.Contains("_DbConnect");
+        File.WriteAllText(csprojPath, isServer ? GenerateWebCsproj(usesSqlite) : GenerateCsproj(usesSqlite));
 
         string rid = RuntimeInformation.RuntimeIdentifier;
         Console.WriteLine($"\n[EMITTER] Workspace locked: {_workspacePath}");
@@ -31,6 +32,11 @@ public sealed class NativeEmitter
         if (isServer)
         {
             Console.WriteLine($"[EMITTER] Building web server for {rid}...");
+            publishArgs = $"publish -c Release -r {rid} --self-contained true";
+        }
+        else if (usesSqlite)
+        {
+            Console.WriteLine($"[EMITTER] Building self-contained binary for {rid} (SQLite; skipping AOT)...");
             publishArgs = $"publish -c Release -r {rid} --self-contained true";
         }
         else
@@ -81,29 +87,37 @@ public sealed class NativeEmitter
         return binaryPath;
     }
 
-    private string GenerateCsproj()
+    private string GenerateCsproj(bool usesSqlite = false)
     {
-        return @"<Project Sdk=""Microsoft.NET.Sdk"">
+        string sqliteRef = usesSqlite
+            ? "\n  <ItemGroup>\n    <PackageReference Include=\"Microsoft.Data.Sqlite\" Version=\"8.0.0\" />\n  </ItemGroup>"
+            : "";
+        // NativeAOT is incompatible with Microsoft.Data.Sqlite — fall back to self-contained JIT
+        string aotProps = usesSqlite
+            ? "<SelfContained>true</SelfContained>"
+            : "<PublishAot>true</PublishAot>\n    <OptimizationPreference>Speed</OptimizationPreference>\n    <StripSymbols>true</StripSymbols>";
+        return $@"<Project Sdk=""Microsoft.NET.Sdk"">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <PublishAot>true</PublishAot>
-    <OptimizationPreference>Speed</OptimizationPreference>
-    <StripSymbols>true</StripSymbols>
-  </PropertyGroup>
+    {aotProps}
+  </PropertyGroup>{sqliteRef}
 </Project>";
     }
 
-    private string GenerateWebCsproj()
+    private string GenerateWebCsproj(bool usesSqlite = false)
     {
-        return @"<Project Sdk=""Microsoft.NET.Sdk.Web"">
+        string sqliteRef = usesSqlite
+            ? "\n  <ItemGroup>\n    <PackageReference Include=\"Microsoft.Data.Sqlite\" Version=\"8.0.0\" />\n  </ItemGroup>"
+            : "";
+        return $@"<Project Sdk=""Microsoft.NET.Sdk.Web"">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-  </PropertyGroup>
+  </PropertyGroup>{sqliteRef}
 </Project>";
     }
 }

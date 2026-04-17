@@ -73,6 +73,7 @@ static void PrintUsage()
     Console.WriteLine("  --allow-file-write                Allow file write only");
     Console.WriteLine("  --allow-http                      Allow outbound HTTP requests");
     Console.WriteLine("  --allow-env                       Allow reading environment variables");
+    Console.WriteLine("  --allow-db                        Allow SQLite database operations");
 }
 
 static string? ParseOption(string[] args, string flag)
@@ -87,6 +88,7 @@ static Permissions ParsePermissions(string[] args) => new()
     AllowFileWrite = args.Contains("--allow-file-write") || args.Contains("--allow-file"),
     AllowHttp = args.Contains("--allow-http"),
     AllowEnv = args.Contains("--allow-env"),
+    AllowDb = args.Contains("--allow-db"),
 };
 
 static void RunCompile(string filePath, bool emitBinary, string outputFormat, Permissions? permissions = null)
@@ -235,6 +237,7 @@ static async Task RunIntentAgent(string intent, bool emitBinary, string outputFo
     if (inferred.AllowFileRead && !(explicitPermissions?.AllowFileRead ?? false)) autoGranted.Add("file-read");
     if (inferred.AllowFileWrite && !(explicitPermissions?.AllowFileWrite ?? false)) autoGranted.Add("file-write");
     if (inferred.AllowEnv && !(explicitPermissions?.AllowEnv ?? false)) autoGranted.Add("env");
+    if (inferred.AllowDb && !(explicitPermissions?.AllowDb ?? false)) autoGranted.Add("db");
     if (autoGranted.Count > 0)
         Console.WriteLine($"[PERMISSIONS] Auto-granted from intent: {string.Join(", ", autoGranted)}");
 

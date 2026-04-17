@@ -36,10 +36,10 @@ public sealed class JsonModule : IStdlibModule
             {
                 var key = args[i]?.ToString() ?? "";
                 var value = args[i + 1];
-                if (value is double d)
-                    pairs.Add($"\"{key}\":{d}");
-                else
-                    pairs.Add($"\"{key}\":\"{value}\"");
+                string serialized = value is double d
+                    ? d.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    : JsonSerializer.Serialize(value?.ToString() ?? "");
+                pairs.Add($"\"{key}\":{serialized}");
             }
             return "{" + string.Join(",", pairs) + "}";
         };
@@ -53,18 +53,19 @@ public sealed class JsonModule : IStdlibModule
 
         // Transpiler side — emits System.Text.Json calls
         registry.TranspilerEmitters["json.get"] = (args, r) =>
-            $"System.Text.Json.JsonDocument.Parse({r(args[0])}).RootElement" +
-            $".GetProperty({r(args[1])}).GetString()";
+            $"(System.Text.Json.JsonDocument.Parse({r(args[0])}).RootElement" +
+            $".TryGetProperty({r(args[1])}, out var _jp) ? _jp.GetString() ?? \"\" : \"\")";
 
         registry.TranspilerEmitters["json.get_num"] = (args, r) =>
-            $"System.Text.Json.JsonDocument.Parse({r(args[0])}).RootElement" +
-            $".GetProperty({r(args[1])}).GetDouble()";
+            $"(System.Text.Json.JsonDocument.Parse({r(args[0])}).RootElement" +
+            $".TryGetProperty({r(args[1])}, out var _jpn) ? _jpn.GetDouble() : 0.0)";
 
         registry.TranspilerEmitters["json.object"] = (args, r) =>
         {
             var pairs = new List<string>();
             for (int i = 0; i < args.Count; i += 2)
-                pairs.Add($"\"\\\"\" + {r(args[i])} + \"\\\":\" + {r(args[i + 1])}");
+                // Use JsonSerializer.Serialize for values so strings are quoted+escaped and numbers are bare
+                pairs.Add($"\"\\\"\" + {r(args[i])} + \"\\\":\" + System.Text.Json.JsonSerializer.Serialize((object?){r(args[i + 1])})");
             return $"\"{{\" + {string.Join(" + \",\" + ", pairs)} + \"}}\"";
         };
 
@@ -87,6 +88,6 @@ public sealed class JsonModule : IStdlibModule
                 _ => prop.GetRawText()
             };
         }
-        throw new KeyNotFoundException($"json.get: key '{key}' not found in JSON");
+        return "";  // missing key → empty string (safe default, consistent with transpiler)
     }
 }

@@ -28,6 +28,7 @@ public sealed class Transpiler
     public bool IsServerMode => _serverPort is not null;
 
     private readonly bool _requiresHttpClient;
+    private readonly bool _requiresSqlite;
 
     public Transpiler(Permissions? permissions = null) : this(permissions, null) { }
 
@@ -38,6 +39,7 @@ public sealed class Transpiler
         _permissionReqs = registry.PermissionRequirements;
         _permissions = permissions ?? Permissions.None;
         _requiresHttpClient = registry.RequiresHttpClient;
+        _requiresSqlite = registry.RequiresSqlite;
         _moduleLoader = moduleLoader;
     }
 
@@ -79,6 +81,8 @@ public sealed class Transpiler
         if (_requiresHttpClient)
             sb.AppendLine("  static readonly System.Net.Http.HttpClient _httpClient = new();");
         sb.AppendLine("  static void Main(string[] args) {");
+        if (_requiresSqlite)
+            sb.AppendLine(DbModule.HelperCode);
         sb.Append(body);
         EmitAutoEntryPoint(sb);
         sb.AppendLine("  }");
@@ -97,6 +101,12 @@ public sealed class Transpiler
         sb.AppendLine();
 
         // Emit function definitions and other code
+        if (_requiresSqlite)
+        {
+            sb.AppendLine("using Microsoft.Data.Sqlite;");
+            sb.AppendLine();
+            sb.AppendLine(DbModule.HelperCode);
+        }
         sb.Append(body);
         sb.AppendLine();
 
@@ -491,16 +501,17 @@ public sealed class Transpiler
         var varType  = _types.GetVarType(name);
         var exprType = _types.InferExpression(rhs);
 
-        bool isArrayDecl  = varType is ArrayType && exprType is ArrayType && _declaredArrayVars.Add(name);
-        bool isStringDecl = varType is StrType   && exprType is StrType   && _declaredStringVars.Add(name);
+        bool isArrayDecl  = isDef && varType is ArrayType && exprType is ArrayType && _declaredArrayVars.Add(name);
+        bool isStringDecl = isDef && varType is StrType   && exprType is StrType   && _declaredStringVars.Add(name);
 
         if (isArrayDecl)
             sb.AppendLine($"    double[] {name} = {TranspileExpression(rhs)};");
         else if (isStringDecl)
             sb.AppendLine($"    string {name} = {TranspileExpression(rhs)};");
-        else if (varType is ArrayType || varType is StrType)
+        else if (isDef && (varType is ArrayType || varType is StrType))
         {
-            // Placeholder assignment skipped — the real typed declaration comes later.
+            // Placeholder def skipped — the real typed declaration was already emitted above (explicit type path)
+            // or will be emitted at the hoisted location.
         }
         else if (isDef)
             sb.AppendLine($"    var {name} = {TranspileExpression(rhs)};");

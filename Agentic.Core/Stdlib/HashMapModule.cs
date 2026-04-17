@@ -25,7 +25,7 @@ public sealed class HashMapModule : IStdlibModule
             var map = (Dictionary<string, object>)a[0];
             var key = Convert.ToString(a[1])!;
             map[key] = a[2];
-            return a[2];
+            return (object)map;  // return the map, not the value — enables chaining
         };
 
         registry.VerifierFuncs["map.has"] = a =>

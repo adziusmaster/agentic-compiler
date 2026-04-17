@@ -25,9 +25,7 @@ public abstract record AgType
         ArrayType { Element: NumType } => "double[]",
         ArrayType { Element: StrType } => "string[]",
         ArrayType => "object[]",
-        HashMapType { ValueType: NumType } => "Dictionary<string, double>",
-        HashMapType { ValueType: StrType } => "Dictionary<string, string>",
-        HashMapType => "Dictionary<string, object>",
+        HashMapType => "Dictionary<string, object>",  // always object — map values are dynamically typed
         StructType s => s.Name,
         _ => "var"
     };

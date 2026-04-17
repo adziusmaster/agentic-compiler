@@ -58,3 +58,7 @@ nunit-*.xml
 
 # AG specific cache
 .agc-cache/
+
+# vscode settings
+.vscode/
+vscode-agentic/

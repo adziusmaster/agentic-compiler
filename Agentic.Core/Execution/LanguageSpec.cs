@@ -182,6 +182,24 @@ Tests still run at compile time. Only route registration + listen are server-spe
 ```
 During verification, env.get returns """", env.get_or returns the default.
 
+## SQLite Database (import std.db) — requires --allow-db
+```
+(db.connect ""mydb.sqlite"")                         ; open/create database file
+(db.exec ""CREATE TABLE IF NOT EXISTS t (id TEXT, n REAL)"") ; run DDL/DML SQL
+(db.insert ""table"" ""col1"" val1 ""col2"" val2 …) ; insert row → 1.0 success, 0.0 if UNIQUE/constraint violated (never throws)
+(db.find-all ""table"")                              ; fetch all rows → rows
+(db.find-by ""table"" ""col"" value)                  ; filter by column → rows
+(db.update ""table"" ""id-col"" id-val ""set-col"" new-val) ; update rows
+(db.delete ""table"" ""id-col"" id-val)               ; delete rows
+(db.row.count rows)                                 ; number of rows → Num
+(db.row.get rows idx ""col"")                        ; get column value → Str
+```
+`rows` is an opaque result set returned by `db.find-all` / `db.find-by`.
+During verification, an in-memory dictionary store is used (no file needed).
+Transpiles to Microsoft.Data.Sqlite (NuGet auto-added).
+IMPORTANT: Tests should use db.insert + db.find-all/find-by to verify logic.
+           Never use db.connect in tests — the in-memory store is always ready.
+
 ## Error Handling
 ```
 (throw ""error message"")         ; raise an error

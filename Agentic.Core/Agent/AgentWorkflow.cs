@@ -244,12 +244,17 @@ Fix ALL errors listed above. Output ONLY the corrected Agentic source code. No e
             "environment variable", "env var", "getenv", "config from env",
             "read env", "api key from env");
 
+        bool db = ContainsAny(lower,
+            "database", "sqlite", "crud", "persist", "store data", "save to db",
+            "read from db", "insert into", "select from", "table", "sql");
+
         return new Permissions
         {
             AllowHttp = http,
             AllowFileRead = fileRead || fileWrite,
             AllowFileWrite = fileWrite,
             AllowEnv = env,
+            AllowDb = db,
         };
     }
 
@@ -270,6 +275,7 @@ Fix ALL errors listed above. Output ONLY the corrected Agentic source code. No e
         AllowFileWrite = a.AllowFileWrite || b.AllowFileWrite,
         AllowHttp = a.AllowHttp || b.AllowHttp,
         AllowEnv = a.AllowEnv || b.AllowEnv,
+        AllowDb = a.AllowDb || b.AllowDb,
     };
 }
 

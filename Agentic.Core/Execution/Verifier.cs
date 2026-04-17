@@ -522,8 +522,16 @@ public sealed class Verifier
 
     private bool ExecuteComparison(string op, ListNode list)
     {
-        double l = Convert.ToDouble(Evaluate(list.Elements[1]));
-        double r = Convert.ToDouble(Evaluate(list.Elements[2]));
+        var lv = Evaluate(list.Elements[1]);
+        var rv = Evaluate(list.Elements[2]);
+        // For = operator, support string equality without numeric conversion
+        if (op == "=")
+        {
+            if (lv is string ls && rv is string rs) return ls == rs;
+            if (lv is string || rv is string) return lv?.ToString() == rv?.ToString();
+        }
+        double l = Convert.ToDouble(lv);
+        double r = Convert.ToDouble(rv);
         return op switch { "<" => l < r, ">" => l > r, "=" => l == r, "<=" => l <= r, ">=" => l >= r, _ => false };
     }
 
