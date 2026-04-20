@@ -36,6 +36,6 @@ public sealed class DefStructEmitSnapshotTests
         csharp.Should().Contain("class Program");
         csharp.Should().Contain("static void Main(string[] args)");
         csharp.Should().Contain("var r = new Rect(10.0, 5.0);");
-        csharp.Should().Contain("Console.Write((r.w * r.h));");
+        csharp.Should().Contain("Console.Write(AgCanonical.Out((r.w * r.h)));");
     }
 }

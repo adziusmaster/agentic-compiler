@@ -17,7 +17,7 @@ public sealed class TranspilerTests
         string csharp = new Transpiler().Transpile(ast);
 
         // Assert
-        csharp.Should().Contain("Console.Write(\"Hello\")");
+        csharp.Should().Contain("Console.Write(AgCanonical.Out(\"Hello\"))");
     }
 
     [Fact]

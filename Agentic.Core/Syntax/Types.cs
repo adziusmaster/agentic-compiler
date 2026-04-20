@@ -27,8 +27,19 @@ public abstract record AgType
         ArrayType => "object[]",
         HashMapType => "Dictionary<string, object>",  // always object — map values are dynamically typed
         StructType s => s.Name,
+        FuncType f => ToFuncCSharp(f),
         _ => "var"
     };
+
+    private static string ToFuncCSharp(FuncType f)
+    {
+        var parts = f.Params.Select(ToCSharp).ToList();
+        if (f.Return is not BoolType && f.Return is UnknownType)
+            return "System.Delegate";
+        // Action<...> for void returns; we don't model void yet, so always Func<...>.
+        parts.Add(ToCSharp(f.Return));
+        return $"Func<{string.Join(", ", parts)}>";
+    }
 }
 
 /// <summary>Numeric type (C# <c>double</c>).</summary>

@@ -51,9 +51,10 @@ public sealed class TypeAnnotationsTests
     }
 
     [Fact]
-    public void ParseAnnotation_UnknownIdentifier_ShouldReturnUnknown()
+    public void ParseAnnotation_LowercaseUnknownIdentifier_ShouldReturnUnknown()
     {
-        var atom = new AtomNode(new Token(TokenType.Identifier, "Foo", 0, 0));
+        // Lowercase identifiers are not treated as struct references.
+        var atom = new AtomNode(new Token(TokenType.Identifier, "foo", 0, 0));
         TypeAnnotations.ParseAnnotation(atom).Should().Be(AgType.Unknown);
     }
 

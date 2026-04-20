@@ -21,7 +21,7 @@ public sealed class CompilerFacadeTests
 
         // Assert
         result.Success.Should().BeTrue();
-        result.GeneratedSource.Should().Contain("Console.Write(\"hello\")");
+        result.GeneratedSource.Should().Contain("Console.Write(AgCanonical.Out(\"hello\"))");
         result.Diagnostics.Should().BeEmpty();
     }
 

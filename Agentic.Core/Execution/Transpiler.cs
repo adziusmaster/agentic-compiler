@@ -72,9 +72,10 @@ public sealed class Transpiler
         sb.AppendLine("using System;");
         sb.AppendLine("using System.Collections.Generic;");
         sb.AppendLine("using System.Linq;");
+        sb.AppendLine(Runtime.CanonicalFormat.EmittedSource);
         foreach (var s in _types.Structs.All)
         {
-            var fieldList = string.Join(", ", s.Fields.Select(f => $"double {f.Field}"));
+            var fieldList = string.Join(", ", s.Fields.Select(f => $"{AgType.ToCSharp(f.Type)} {f.Field}"));
             sb.AppendLine($"public record struct {s.Name}({fieldList});");
         }
         sb.AppendLine("class Program {");
@@ -98,6 +99,7 @@ public sealed class Transpiler
         sb.AppendLine("using System.Linq;");
         sb.AppendLine("using Microsoft.AspNetCore.Builder;");
         sb.AppendLine("using Microsoft.AspNetCore.Http;");
+        sb.AppendLine(Runtime.CanonicalFormat.EmittedSource);
         sb.AppendLine();
 
         // Emit function definitions and other code
@@ -237,7 +239,7 @@ public sealed class Transpiler
 
             case "sys.stdout.write":
                 _hasMainOutput = true;
-                sb.AppendLine($"    Console.Write({TranspileExpression(list.Elements[1])});");
+                sb.AppendLine($"    Console.Write(AgCanonical.Out({TranspileExpression(list.Elements[1])}));");
                 break;
 
             case "if":
@@ -494,6 +496,19 @@ public sealed class Transpiler
     {
         if (explicitType is not null && explicitType is not UnknownType)
         {
+            // Element-typed arr.new: use the annotation's element type so (Array Str)
+            // materializes as string[] rather than the default double[].
+            if (explicitType is ArrayType at
+                && rhs is ListNode arrList
+                && arrList.Elements.Count >= 2
+                && arrList.Elements[0] is AtomNode arrOp
+                && arrOp.Token.Value == "arr.new")
+            {
+                string size = TranspileExpression(arrList.Elements[1]);
+                string element = AgType.ToCSharp(at.Element);
+                sb.AppendLine($"    {AgType.ToCSharp(explicitType)} {name} = new {element}[(int)({size})];");
+                return;
+            }
             sb.AppendLine($"    {AgType.ToCSharp(explicitType)} {name} = {TranspileExpression(rhs)};");
             return;
         }
@@ -603,6 +618,6 @@ public sealed class Transpiler
         }
 
         var argList = string.Join(", ", Enumerable.Range(0, parameters.Count).Select(i => $"_arg{i}"));
-        sb.AppendLine($"    Console.Write({name}({argList}));");
+        sb.AppendLine($"    Console.Write(AgCanonical.Out({name}({argList})));");
     }
 }

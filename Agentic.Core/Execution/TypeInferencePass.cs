@@ -86,9 +86,7 @@ internal sealed class TypeInferencePass
                     && list.Elements[1] is AtomNode structName
                     && list.Elements[2] is ListNode structFields)
                 {
-                    var fields = new List<(string, AgType)>(structFields.Elements.Count);
-                    foreach (var f in structFields.Elements)
-                        if (f is AtomNode fa) fields.Add((fa.Token.Value, AgType.Num));
+                    var fields = TypeAnnotations.ParseStructFields(structFields);
                     Structs.Register(new StructType(structName.Token.Value, fields));
                 }
                 break;

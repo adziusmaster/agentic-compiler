@@ -155,7 +155,7 @@ public sealed class DefStructTests
         string csharp = new Transpiler().Transpile(ast);
 
         // Assert
-        csharp.Should().Contain("Console.Write(r.w)");
+        csharp.Should().Contain("Console.Write(AgCanonical.Out(r.w))");
     }
 
     [Fact]

@@ -500,7 +500,11 @@ public sealed class Verifier
         return op switch { "+" => l + r, "-" => l - r, "*" => l * r, "/" => l / r, _ => 0 };
     }
 
-    private object? ExecuteStdoutWrite(ListNode list) { _stdoutBuffer.Append(Evaluate(list.Elements[1])); return null; }
+    private object? ExecuteStdoutWrite(ListNode list)
+    {
+        _stdoutBuffer.Append(Runtime.CanonicalFormat.ForWrite(Evaluate(list.Elements[1])));
+        return null;
+    }
 
     private object ExecuteInputGet(ListNode list)
     {
@@ -560,9 +564,7 @@ public sealed class Verifier
     {
         string name = ((AtomNode)RequireArg(list, 1, "defstruct <Name> (<fields…>)")).Token.Value;
         var fieldList = (ListNode)RequireArg(list, 2, "defstruct <Name> (<fields…>)");
-        var fields = new List<(string, AgType)>(fieldList.Elements.Count);
-        foreach (var f in fieldList.Elements)
-            fields.Add((((AtomNode)f).Token.Value, AgType.Num));
+        var fields = TypeAnnotations.ParseStructFields(fieldList);
         _env.Types.Register(new StructType(name, fields));
         return null;
     }

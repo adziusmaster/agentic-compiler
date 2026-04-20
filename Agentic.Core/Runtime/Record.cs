@@ -21,6 +21,9 @@ internal sealed class Record
             : throw new System.InvalidOperationException(
                 $"Field '{field}' not found on record of type '{TypeName}'.");
 
+    /// <summary>Fields in insertion (i.e. declaration) order, for canonical serialization.</summary>
+    public IEnumerable<KeyValuePair<string, object>> EnumerateFields() => _fields;
+
     /// <summary>Returns a copy with a single field replaced (wither pattern).</summary>
     public Record With(string field, object value)
     {

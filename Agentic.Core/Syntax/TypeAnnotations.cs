@@ -35,6 +35,12 @@ public static class TypeAnnotations
                 "Num" => AgType.Num,
                 "Str" => AgType.Str,
                 "Bool" => AgType.Bool,
+                // User-defined struct types are referred to by bare name in annotations,
+                // e.g. `(defun midpoint ((a : Point) (b : Point)) : Point …)`. We emit a
+                // shallow StructType here; the full field list is resolved via TypeRegistry
+                // at use sites. The name is enough for code generation.
+                var s when s.Length > 0 && char.IsUpper(s[0]) =>
+                    new StructType(s, System.Array.Empty<(string, AgType)>()),
                 _ => AgType.Unknown
             };
         }
@@ -47,11 +53,28 @@ public static class TypeAnnotations
             {
                 "Array" => AgType.ArrayOf(ParseAnnotation(list.Elements[1])),
                 "Map" when list.Elements.Count >= 3 => AgType.MapOf(ParseAnnotation(list.Elements[2])),
+                // (Func T1 T2 … R) — last element is the return type, preceding are params.
+                // (Func R) is a thunk (no params).
+                "Func" => ParseFuncAnnotation(list),
                 _ => AgType.Unknown
             };
         }
 
         return AgType.Unknown;
+    }
+
+    private static FuncType ParseFuncAnnotation(ListNode list)
+    {
+        // list.Elements[0] is "Func" atom; remaining are param types followed by return type.
+        int n = list.Elements.Count;
+        if (n < 2) return new FuncType(Array.Empty<AgType>(), AgType.Unknown);
+
+        var retType = ParseAnnotation(list.Elements[n - 1]);
+        var paramTypes = new List<AgType>(n - 2);
+        for (int i = 1; i < n - 1; i++)
+            paramTypes.Add(ParseAnnotation(list.Elements[i]));
+
+        return new FuncType(paramTypes, retType);
     }
 
     /// <summary>
@@ -111,6 +134,32 @@ public static class TypeAnnotations
         }
 
         return (name, null, defList.Elements[2]);
+    }
+
+    /// <summary>
+    /// Parses a struct field list, accepting either <c>field_name</c> (defaults to
+    /// <see cref="NumType"/>) or a typed <c>(field_name : Type)</c> pair.
+    /// </summary>
+    public static IReadOnlyList<(string Field, AgType Type)> ParseStructFields(ListNode fieldList)
+    {
+        var result = new List<(string, AgType)>(fieldList.Elements.Count);
+
+        foreach (var element in fieldList.Elements)
+        {
+            if (element is AtomNode atom)
+            {
+                result.Add((atom.Token.Value, AgType.Num));
+            }
+            else if (element is ListNode typed
+                     && typed.Elements.Count >= 3
+                     && typed.Elements[0] is AtomNode nameAtom
+                     && typed.Elements[1] is AtomNode { Token.Value: ":" })
+            {
+                result.Add((nameAtom.Token.Value, ParseAnnotation(typed.Elements[2])));
+            }
+        }
+
+        return result;
     }
 
     /// <summary>

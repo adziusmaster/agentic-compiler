@@ -1,0 +1,17 @@
+(module CanonicalOutput
+  ; Demonstrates that sys.stdout.write emits canonical, round-trippable form
+  ; for composite values (arrays, records, maps) — the substrate the
+  ; Implementer's micro-test probes rely on for non-numeric helpers.
+
+  (defun make-totals () : (Map Str Num)
+    (def totals : (Map Str Num) (map.new))
+    (map.set totals "apples" 30)
+    (map.set totals "pears" 45)
+    (return totals))
+
+  (test totals-shape
+    ; The canonical form is deterministic: keys sorted lexicographically.
+    (assert-eq (map.get (make-totals) "apples") 30)
+    (assert-eq (map.get (make-totals) "pears") 45))
+
+  (sys.stdout.write (make-totals)))
