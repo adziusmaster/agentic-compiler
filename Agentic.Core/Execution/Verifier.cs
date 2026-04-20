@@ -329,8 +329,21 @@ public sealed class Verifier
         if (_env.Types.TryResolveOp(name, out var typeName, out var member))
             return ExecuteStructOp(typeName, member, list);
 
+        // First-class function value: `name` refers to a variable holding an AgFunc
+        // (e.g. function-typed parameter). Dispatch through its underlying defun.
         if (!_env.TryGetFunction(name, out var funcDef))
-            throw new InvalidOperationException($"Function '{name}' is not defined. Check spelling or define it with (defun {name} ...).");
+        {
+            var resolved = _env.Get(name);
+            if (resolved is Runtime.AgFunc agFunc)
+            {
+                funcDef = agFunc.Definition;
+                name = agFunc.Name;
+            }
+            else
+            {
+                throw new InvalidOperationException($"Function '{name}' is not defined. Check spelling or define it with (defun {name} ...).");
+            }
+        }
 
         // Export enforcement: private imported functions can only be called from within imported code
         if (_importedPrivate.Contains(name) && _importedCallDepth == 0)
@@ -345,7 +358,26 @@ public sealed class Verifier
 
         var frame = new Dictionary<string, object>();
         for (int i = 0; i < sig.Parameters.Count; i++)
-            frame[sig.Parameters[i].Param.Replace("-", "_")] = Evaluate(list.Elements[i + 1])!;
+        {
+            var paramMeta = sig.Parameters[i];
+            var argNode = list.Elements[i + 1];
+            object value;
+
+            // Function-typed parameter + bare-identifier argument that resolves to a defun
+            // → pass an AgFunc reference instead of evaluating as a value.
+            if (paramMeta.Type is FuncType
+                && argNode is AtomNode { Token.Type: TokenType.Identifier } argAtom
+                && _env.TryGetFunction(argAtom.Token.Value.Replace("-", "_"), out var refDef))
+            {
+                value = new Runtime.AgFunc(argAtom.Token.Value.Replace("-", "_"), refDef);
+            }
+            else
+            {
+                value = Evaluate(argNode)!;
+            }
+
+            frame[paramMeta.Param.Replace("-", "_")] = value;
+        }
 
         bool isImported = _importedAll.Contains(name);
         if (isImported) _importedCallDepth++;

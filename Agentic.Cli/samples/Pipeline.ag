@@ -1,0 +1,31 @@
+(module Pipeline
+  ; A3 end-to-end: higher-order functions composing a classic map → filter → reduce
+  ; pipeline. Helpers `square`, `is-even`, and `sum` are passed by reference
+  ; through arr.map / arr.filter / arr.reduce without any lambda syntax.
+
+  (defun square ((n : Num)) : Num
+    (return (* n n)))
+
+  (defun is-even ((n : Num)) : Num
+    (return (if (= (- n (* 2 (/ n 2))) 0) 1 0)))
+
+  (defun sum ((acc : Num) (n : Num)) : Num
+    (return (+ acc n)))
+
+  ; First-class: `f` is a function-typed parameter, applied twice.
+  (defun apply-twice ((f : (Func Num Num)) (x : Num)) : Num
+    (return (f (f x))))
+
+  (test apply-twice-inc
+    (defun inc ((n : Num)) : Num (return (+ n 1)))
+    (assert-eq (apply-twice inc 5) 7))
+
+  (test pipeline-sum-of-squares
+    (def xs (arr.new 4))
+    (arr.set xs 0 1)
+    (arr.set xs 1 2)
+    (arr.set xs 2 3)
+    (arr.set xs 3 4)
+    (assert-eq (arr.reduce (arr.map xs square) sum 0) 30))
+
+  (sys.stdout.write (apply-twice square 2)))
