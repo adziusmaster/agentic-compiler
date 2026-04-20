@@ -113,6 +113,43 @@ public static class TypeAnnotations
     }
 
     /// <summary>
+    /// Parses an <c>(extern defun name ((p : T)) : R @capability "cap.name")</c> form.
+    /// Returns the capability name plus the signature. Caller validates that the
+    /// capability is registered.
+    /// </summary>
+    public static (DefunSignature Signature, string Capability) ParseExternDefun(ListNode externList)
+    {
+        // (extern defun name (params) : RetType @capability "cap.name")
+        // Re-slice as (defun name (params) : RetType) for ParseDefun, then pull the capability.
+        var defunElems = new List<AstNode> {
+            new AtomNode(new Token(TokenType.Identifier, "defun", 0, 0))
+        };
+        string? capability = null;
+
+        for (int i = 2; i < externList.Elements.Count; i++)
+        {
+            var el = externList.Elements[i];
+            if (el is AtomNode { Token.Value: "@capability" } && i + 1 < externList.Elements.Count
+                && externList.Elements[i + 1] is AtomNode capAtom)
+            {
+                capability = capAtom.Token.Value;
+                break;
+            }
+            defunElems.Add(el);
+        }
+
+        if (capability is null)
+            throw new InvalidOperationException(
+                "extern defun requires '@capability \"name\"' trailing declaration.");
+
+        // extern has no body; supply a placeholder for ParseDefun's WrapBody.
+        defunElems.Add(new AtomNode(new Token(TokenType.Number, "0", 0, 0)));
+
+        var sig = ParseDefun(new ListNode(defunElems));
+        return (sig, capability);
+    }
+
+    /// <summary>
     /// Extracts the name, optional explicit type, and value expression from a <c>(def ...)</c> form.
     /// </summary>
     /// <remarks>

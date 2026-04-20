@@ -1,4 +1,5 @@
 using System.Text;
+using Agentic.Core.Capabilities;
 using Agentic.Core.Runtime;
 using Agentic.Core.Stdlib;
 using Agentic.Core.Syntax;
@@ -46,14 +47,27 @@ public sealed class Verifier
     /// </summary>
     public bool CollectAllErrors { get; set; }
 
+    /// <summary>Capabilities declared via <c>(extern defun …)</c> and their host adapters.</summary>
+    public CapabilityRegistry Capabilities { get; }
+
+    /// <summary>Capabilities declared by the current program (names only; subset of Capabilities).</summary>
+    public HashSet<string> DeclaredCapabilities { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>Mock bindings active for the current <c>(test …)</c> frame.</summary>
+    private readonly Stack<Dictionary<(string Cap, string Key), object?>> _mocks = new();
+
+    /// <summary>When true, capability adapters run real I/O even without a mock.</summary>
+    public bool AllowRealIo { get; set; }
+
     public Verifier(string[] inputs = null!) : this(inputs, null, null) { }
 
-    internal Verifier(string[]? inputs, ModuleLoader? moduleLoader, ImportState? importState)
+    internal Verifier(string[]? inputs, ModuleLoader? moduleLoader, ImportState? importState, CapabilityRegistry? capabilities = null)
     {
         _inputs = inputs ?? Array.Empty<string>();
         _nativeLibrary = StdlibModules.Build().VerifierFuncs;
         _moduleLoader = moduleLoader;
         _importState = importState ?? new ImportState();
+        Capabilities = capabilities ?? DefaultCapabilities.BuildTrusted();
     }
 
     /// <summary>
@@ -108,6 +122,7 @@ public sealed class Verifier
                 "if"     => ExecuteIf(list),
                 "while"  => ExecuteWhile(list),
                 "defun"     => ExecuteDefun(list),
+                "extern"    => ExecuteExternDefun(list),
                 "defstruct" => ExecuteDefStruct(list),
                 "return"    => throw new ReturnException(Evaluate(list.Elements[1])),
 
@@ -325,6 +340,11 @@ public sealed class Verifier
     {
         if (_nativeLibrary.TryGetValue(name, out var native))
             return native(list.Elements.Skip(1).Select(Evaluate).ToArray()!);
+
+        // Capability FFI: dispatch extern defun calls through the capability adapter
+        // (or active mock). The capability name must have been declared via (extern defun …).
+        if (_externFunctions.TryGetValue(name, out var capability))
+            return InvokeCapability(capability, list);
 
         if (_env.Types.TryResolveOp(name, out var typeName, out var member))
             return ExecuteStructOp(typeName, member, list);
@@ -589,6 +609,64 @@ public sealed class Verifier
         return null;
     }
 
+    /// <summary>
+    /// (extern defun name ((p : T)) : R @capability "cap.name") — declares an FFI
+    /// boundary. The capability must be registered in <see cref="Capabilities"/>.
+    /// Adds the declared name to <see cref="DeclaredCapabilities"/> for manifest emission.
+    /// </summary>
+    private object? ExecuteExternDefun(ListNode list)
+    {
+        var (sig, capabilityName) = TypeAnnotations.ParseExternDefun(list);
+
+        if (!Capabilities.TryGet(capabilityName, out var capability))
+            throw new InvalidOperationException(
+                $"Unknown capability '{capabilityName}'. Only trusted capabilities declared in the registry may be used.");
+
+        DeclaredCapabilities.Add(capabilityName);
+
+        // Register a synthetic function def so calls dispatch through ExecuteFunctionCall.
+        // The actual adapter is invoked via the capability map keyed on the function name.
+        _externFunctions[sig.Name] = capability;
+        return null;
+    }
+
+    private readonly Dictionary<string, Capability> _externFunctions = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Dispatches a capability call, honoring active mocks before falling back to
+    /// the real adapter. Under default verification (<see cref="AllowRealIo"/> = false),
+    /// a capability call with no mock throws, keeping the verifier hermetic.
+    /// </summary>
+    private object? InvokeCapability(Capability capability, ListNode list)
+    {
+        var args = list.Elements.Skip(1).Select(Evaluate).ToArray();
+
+        // Active mock for (capability, first-arg) wins. First arg is the natural
+        // "key" for most capabilities (URL for http.fetch, path for file.read).
+        // Zero-arg capabilities mock on empty string.
+        string key = args.Length > 0 ? Convert.ToString(args[0]) ?? "" : "";
+        foreach (var frame in _mocks)
+        {
+            if (frame.TryGetValue((capability.Name, key), out var mocked))
+                return mocked;
+            if (frame.TryGetValue((capability.Name, "*"), out var wildcard))
+                return wildcard;
+        }
+
+        if (!AllowRealIo)
+        {
+            // "OS Fault:" prefix lets the Compiler fall through to transpile when
+            // the unmocked capability is at the main-body level (not inside a test).
+            // Capability calls inside tests must always be mocked — those tests will
+            // fail before we reach transpile.
+            throw new InvalidOperationException(
+                $"OS Fault: Capability '{capability.Name}' invoked without a mock. " +
+                $"Add a (mocks …) clause to the enclosing (test …) or pass --allow-real-io.");
+        }
+
+        return capability.Adapter(args!);
+    }
+
     /// <summary>Returns all function names registered in this verifier's environment.</summary>
     internal IEnumerable<string> GetRegisteredFunctionNames() => _env.GetFunctionNames();
 
@@ -650,8 +728,39 @@ public sealed class Verifier
         string testName = list.Elements[1] is AtomNode a ? a.Token.Value
             : list.Elements[1] is ListNode ? "anonymous" : "unnamed";
 
+        // Push a mock frame for the duration of this test. Any (mocks …) block
+        // encountered inside contributes bindings to this frame.
+        var mockFrame = new Dictionary<(string, string), object?>();
+        _mocks.Push(mockFrame);
+        try
+        {
         for (int i = 2; i < list.Elements.Count; i++)
         {
+            // (mocks (cap.name key value) …) — only valid inside a (test …).
+            if (list.Elements[i] is ListNode { Elements.Count: > 0 } mkList
+                && mkList.Elements[0] is AtomNode { Token.Value: "mocks" })
+            {
+                for (int m = 1; m < mkList.Elements.Count; m++)
+                {
+                    if (mkList.Elements[m] is ListNode mkBinding
+                        && mkBinding.Elements.Count >= 3
+                        && mkBinding.Elements[0] is AtomNode capAtom)
+                    {
+                        // Users write the DSL function name (e.g. `http-fetch`), but
+                        // InvokeCapability keys by capability name (e.g. `http.fetch`).
+                        // Translate via _externFunctions so both forms work.
+                        string rawName = capAtom.Token.Value;
+                        string capName = _externFunctions.TryGetValue(rawName, out var resolved)
+                            ? resolved.Name
+                            : rawName;
+                        string key = Convert.ToString(Evaluate(mkBinding.Elements[1])) ?? "";
+                        object? value = Evaluate(mkBinding.Elements[2]);
+                        mockFrame[(capName, key)] = value;
+                    }
+                }
+                continue;
+            }
+
             try
             {
                 Evaluate(list.Elements[i]);
@@ -688,6 +797,11 @@ public sealed class Verifier
         }
         _testsPassed++;
         return null;
+        }
+        finally
+        {
+            _mocks.Pop();
+        }
     }
 
     /// <summary>

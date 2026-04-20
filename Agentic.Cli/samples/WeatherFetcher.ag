@@ -1,0 +1,20 @@
+(module WeatherFetcher
+  ; Capability FFI demo (C1). http-fetch is declared as an extern defun bound
+  ; to the `http.fetch` trusted capability. Compile with --allow-http to grant
+  ; the permission; the emitted binary embeds a manifest that describes this.
+
+  (extern defun http-fetch ((url : Str)) : Str @capability "http.fetch")
+
+  (defun extract-temp ((body : Str)) : Num
+    ; Tiny "parser": grabs 4 chars of the number that follows `"temp": `.
+    ; str.substring takes (start, length), not (start, end).
+    (return (str.to_num (str.substring body
+      (+ (str.index_of body "temp") 7)
+      4))))
+
+  (test fetches-and-parses
+    (mocks (http-fetch "https://api.example.com/weather" "{\"temp\": 21.5, \"city\": \"Amsterdam\"}"))
+    (assert-eq (extract-temp (http-fetch "https://api.example.com/weather")) 21.5))
+
+  (sys.stdout.write
+    (extract-temp (http-fetch "https://api.example.com/weather"))))

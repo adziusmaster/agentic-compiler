@@ -21,6 +21,12 @@ public sealed record Permissions
     /// <summary>Allow SQLite database operations.</summary>
     public bool AllowDb { get; init; }
 
+    /// <summary>Allow clock / wall-time reads (time.now_unix, etc.).</summary>
+    public bool AllowTime { get; init; }
+
+    /// <summary>Allow spawning subprocess / shell commands.</summary>
+    public bool AllowProcess { get; init; }
+
     /// <summary>No permissions — pure computation only (default).</summary>
     public static Permissions None => new();
 
@@ -32,6 +38,8 @@ public sealed record Permissions
         AllowHttp = true,
         AllowEnv = true,
         AllowDb = true,
+        AllowTime = true,
+        AllowProcess = true,
     };
 
     /// <summary>
@@ -46,11 +54,27 @@ public sealed record Permissions
             "http"       => AllowHttp,
             "env"        => AllowEnv,
             "db"         => AllowDb,
+            "time"       => AllowTime,
+            "process"    => AllowProcess,
             _            => throw new ArgumentException($"Unknown capability: {capability}")
         };
 
         if (!granted)
             throw new PermissionDeniedException(capability);
+    }
+
+    /// <summary>Returns the list of permission-keys that are currently granted.</summary>
+    public IReadOnlyList<string> GrantedKeys()
+    {
+        var list = new List<string>();
+        if (AllowFileRead)  list.Add("file.read");
+        if (AllowFileWrite) list.Add("file.write");
+        if (AllowHttp)      list.Add("http");
+        if (AllowEnv)       list.Add("env");
+        if (AllowDb)        list.Add("db");
+        if (AllowTime)      list.Add("time");
+        if (AllowProcess)   list.Add("process");
+        return list;
     }
 }
 

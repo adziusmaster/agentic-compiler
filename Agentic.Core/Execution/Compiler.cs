@@ -1,3 +1,4 @@
+using Agentic.Core.Runtime;
 using Agentic.Core.Stdlib;
 using Agentic.Core.Syntax;
 
@@ -65,7 +66,7 @@ public sealed class Compiler
             };
         }
 
-        var result = Compile(ast, outputName, basePath);
+        var result = Compile(ast, outputName, basePath, source);
 
         if (_cache is not null && result.Success)
             _cache.Store(CompilationCache.ComputeHash(source), result);
@@ -76,7 +77,7 @@ public sealed class Compiler
     /// <summary>
     /// Compiles a pre-parsed AST through the pipeline (type-check → verify → transpile → emit).
     /// </summary>
-    public CompileResult Compile(AstNode ast, string outputName = "program", string? basePath = null)
+    public CompileResult Compile(AstNode ast, string outputName = "program", string? basePath = null, string? source = null)
     {
         var diagnostics = new List<CompileDiagnostic>();
         int testsPassed = 0;
@@ -187,7 +188,13 @@ public sealed class Compiler
         bool isServer;
         try
         {
-            var transpiler = new Transpiler(_permissions, moduleLoader);
+            var transpiler = new Transpiler(_permissions, moduleLoader, null);
+            transpiler.EmbeddedManifest = ProofManifestBuilder.Build(
+                ast,
+                source ?? string.Empty,
+                verifier.Capabilities.All.Where(c => verifier.DeclaredCapabilities.Contains(c.Name)).ToList(),
+                _permissions,
+                testsPassed);
             csharp = transpiler.Transpile(ast);
             isServer = transpiler.IsServerMode;
         }

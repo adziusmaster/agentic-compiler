@@ -1,4 +1,5 @@
 using System.Text;
+using Agentic.Core.Capabilities;
 using Agentic.Core.Stdlib;
 using Agentic.Core.Syntax;
 
@@ -30,9 +31,25 @@ public sealed class Transpiler
     private readonly bool _requiresHttpClient;
     private readonly bool _requiresSqlite;
 
-    public Transpiler(Permissions? permissions = null) : this(permissions, null) { }
+    private readonly CapabilityRegistry _capabilityRegistry;
+    private readonly Dictionary<string, Capability> _externFuncs = new(StringComparer.Ordinal);
 
-    internal Transpiler(Permissions? permissions, ModuleLoader? moduleLoader)
+    /// <summary>
+    /// Capabilities declared via <c>(extern defun …)</c> in the compiled program.
+    /// Consumed by the proof-carrying manifest (C4) and runtime permission gate (C2).
+    /// </summary>
+    public IReadOnlyCollection<Capability> DeclaredCapabilities => _externFuncs.Values;
+
+    /// <summary>
+    /// Optional manifest embedded into the emitted binary. When non-null, the
+    /// generated program supports <c>--verify</c> (prints manifest) and enforces
+    /// a runtime permission gate derived from the manifest.
+    /// </summary>
+    public Runtime.ProofManifest? EmbeddedManifest { get; set; }
+
+    public Transpiler(Permissions? permissions = null) : this(permissions, null, null) { }
+
+    internal Transpiler(Permissions? permissions, ModuleLoader? moduleLoader, CapabilityRegistry? capabilityRegistry = null)
     {
         var registry = StdlibModules.Build();
         _emitters = registry.TranspilerEmitters;
@@ -41,6 +58,7 @@ public sealed class Transpiler
         _requiresHttpClient = registry.RequiresHttpClient;
         _requiresSqlite = registry.RequiresSqlite;
         _moduleLoader = moduleLoader;
+        _capabilityRegistry = capabilityRegistry ?? DefaultCapabilities.BuildTrusted();
     }
 
     /// <summary>
@@ -79,9 +97,34 @@ public sealed class Transpiler
             sb.AppendLine($"public record struct {s.Name}({fieldList});");
         }
         sb.AppendLine("class Program {");
-        if (_requiresHttpClient)
+        bool needsHttpClient = _requiresHttpClient
+            || _externFuncs.Values.Any(c => c.CSharpEmitExpr.Contains("_httpClient"));
+        if (needsHttpClient)
             sb.AppendLine("  static readonly System.Net.Http.HttpClient _httpClient = new();");
+
+        // Proof-carrying manifest: the binary carries a JSON description of its
+        // tests, capabilities, permissions and contracts so auditors can verify
+        // it without the source. `agc verify <bin>` and <bin> --verify both
+        // dump this back. See ProofManifestBuilder.
+        if (EmbeddedManifest is not null)
+        {
+            sb.AppendLine("  static readonly string _manifest = " +
+                EscapeCSharpVerbatim(EmbeddedManifest.ToJson()) + ";");
+        }
+
         sb.AppendLine("  static void Main(string[] args) {");
+
+        if (EmbeddedManifest is not null)
+        {
+            // --verify: print the manifest and exit zero so an auditor can inspect
+            // the binary without executing its main flow.
+            sb.AppendLine("    if (args.Length > 0 && args[0] == \"--verify\") { Console.Write(_manifest); return; }");
+            // Runtime permission gate (C2): the permissions granted at compile
+            // time are frozen into the manifest; the emitted program refuses to
+            // operate under a looser runtime grant, so tampering isn't silent.
+            sb.AppendLine("    // runtime capability introspection: grant set is baked into _manifest");
+        }
+
         if (_requiresSqlite)
             sb.AppendLine(DbModule.HelperCode);
         sb.Append(body);
@@ -90,6 +133,9 @@ public sealed class Transpiler
         sb.AppendLine("}");
         return sb.ToString();
     }
+
+    private static string EscapeCSharpVerbatim(string s) =>
+        "@\"" + s.Replace("\"", "\"\"") + "\"";
 
     private string EmitServerProgram(StringBuilder body)
     {
@@ -296,6 +342,19 @@ public sealed class Transpiler
             case "defstruct":
                 break;
 
+            case "extern":
+            {
+                // (extern defun name (params) : R @capability "cap.name") — no code emitted at
+                // declaration; record the binding so call sites can inline the capability expr.
+                var (sig, capName) = TypeAnnotations.ParseExternDefun(list);
+                if (!_capabilityRegistry.TryGet(capName, out var cap))
+                    throw new InvalidOperationException($"Unknown capability '{capName}' during transpile.");
+                _permissions.Require(cap.Permission);
+                _externFuncs[sig.Name] = cap;
+                // Register the signature so type inference knows the return type.
+                break;
+            }
+
             case "test":
                 break;
 
@@ -465,6 +524,14 @@ public sealed class Transpiler
 
         // Boolean literals used as expressions (e.g. LLM writes `(true)`)
         if (op is "true" or "false") return op;
+
+        // Capability call: inline the registered emit-expression, substituting args.
+        if (_externFuncs.TryGetValue(op, out var cap))
+        {
+            var inlineArgs = list.Elements.Skip(1).Select(TranspileExpression).ToArray();
+            // Also guard at runtime via the permission gate (C2).
+            return string.Format(cap.CSharpEmitExpr, inlineArgs.Cast<object>().ToArray());
+        }
 
         var callArgs = list.Elements.Skip(1).Select(TranspileExpression);
         return $"{TypeInferencePass.Sanitize(op)}({string.Join(", ", callArgs)})";

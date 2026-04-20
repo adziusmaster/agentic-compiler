@@ -24,6 +24,16 @@ switch (command)
         RunCompile(args[1], emitBinary: false, outputFormat: args.Contains("--json") ? "json" : "sexpr", permissions: ParsePermissions(args));
         break;
 
+    case "verify":
+        if (args.Length < 2) { Console.WriteLine("Usage: agc verify <binary>"); return; }
+        RunVerify(args[1]);
+        return;
+
+    case "inspect":
+        if (args.Length < 2) { Console.WriteLine("Usage: agc inspect <binary>"); return; }
+        RunInspect(args[1]);
+        return;
+
     case "agent":
         if (args.Length < 2) { Console.WriteLine("Usage: agc agent <file.ag | \"intent\"> [--out Name]"); return; }
         if (File.Exists(args[1]) && args[1].EndsWith(".ag"))
@@ -61,6 +71,8 @@ static void PrintUsage()
     Console.WriteLine("Usage:");
     Console.WriteLine("  agc compile <file.ag|dir/>        Compile .ag source to native binary (no LLM)");
     Console.WriteLine("  agc check <file.ag|dir/>          Type-check and run tests only (fast feedback)");
+    Console.WriteLine("  agc verify <binary>               Extract embedded proof manifest from a compiled binary");
+    Console.WriteLine("  agc inspect <binary>              Dump the raw manifest JSON from a binary");
     Console.WriteLine("  agc agent <file.ag>               LLM-assisted compilation from constraint spec");
     Console.WriteLine("  agc agent \"build me a ...\"        Intent-driven: LLM writes .ag, compiler verifies");
     Console.WriteLine();
@@ -89,7 +101,63 @@ static Permissions ParsePermissions(string[] args) => new()
     AllowHttp = args.Contains("--allow-http"),
     AllowEnv = args.Contains("--allow-env"),
     AllowDb = args.Contains("--allow-db"),
+    AllowTime = args.Contains("--allow-time"),
+    AllowProcess = args.Contains("--allow-process"),
 };
+
+static void RunVerify(string binaryPath)
+{
+    if (!File.Exists(binaryPath))
+    {
+        Console.WriteLine($"Error: binary '{binaryPath}' not found.");
+        return;
+    }
+
+    var psi = new System.Diagnostics.ProcessStartInfo
+    {
+        FileName = binaryPath,
+        Arguments = "--verify",
+        RedirectStandardOutput = true,
+        UseShellExecute = false
+    };
+    using var process = System.Diagnostics.Process.Start(psi)!;
+    string manifestJson = process.StandardOutput.ReadToEnd();
+    process.WaitForExit();
+
+    if (string.IsNullOrWhiteSpace(manifestJson))
+    {
+        Console.WriteLine("Error: binary returned no manifest. Was it compiled with proof-carrying support?");
+        return;
+    }
+
+    var manifest = Agentic.Core.Runtime.ProofManifest.FromJson(manifestJson);
+    Console.WriteLine($"Agentic binary manifest (schema {manifest.SchemaVersion})");
+    Console.WriteLine($"  Source hash  : {manifest.SourceHash[..16]}…");
+    Console.WriteLine($"  Built at     : {manifest.BuiltAt:u}");
+    Console.WriteLine($"  Capabilities : {(manifest.Capabilities.Count == 0 ? "(none)" : string.Join(", ", manifest.Capabilities))}");
+    Console.WriteLine($"  Permissions  : {(manifest.Permissions.Count == 0 ? "(none — pure)" : string.Join(", ", manifest.Permissions))}");
+    Console.WriteLine($"  Tests        : {manifest.Tests.Count} (compile-time passes: {(manifest.Tests.Count > 0 ? manifest.Tests[0].ExpectedPasses.ToString() : "0")})");
+    foreach (var t in manifest.Tests)
+        Console.WriteLine($"    - {t.Name}");
+    Console.WriteLine($"  Contracts    : {manifest.Contracts.Count}");
+    foreach (var c in manifest.Contracts)
+        Console.WriteLine($"    - {c.Function} ({c.Kind}): {c.SourceSnippet}");
+    Console.WriteLine();
+    Console.WriteLine("Verified: manifest extracted and structurally valid.");
+}
+
+static void RunInspect(string binaryPath)
+{
+    if (!File.Exists(binaryPath)) { Console.WriteLine($"Error: binary '{binaryPath}' not found."); return; }
+    var psi = new System.Diagnostics.ProcessStartInfo
+    {
+        FileName = binaryPath, Arguments = "--verify",
+        RedirectStandardOutput = true, UseShellExecute = false
+    };
+    using var process = System.Diagnostics.Process.Start(psi)!;
+    Console.Write(process.StandardOutput.ReadToEnd());
+    process.WaitForExit();
+}
 
 static void RunCompile(string filePath, bool emitBinary, string outputFormat, Permissions? permissions = null)
 {
