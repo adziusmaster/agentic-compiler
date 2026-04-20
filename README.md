@@ -150,11 +150,49 @@ Tests run **during compilation**. Failing tests = failed build.
 ```
 Compile with `--allow-http` to enable network features.
 
+### Capability FFI + Proof-Carrying Binaries
+Any real I/O (HTTP, time, file, db) must be declared as a **trusted capability** via `extern defun`. The verifier refuses to run capability calls during tests unless a `(mocks …)` clause supplies a deterministic response. The compiled binary embeds a **proof manifest** — source hash, declared capabilities, granted permissions, and every test with its expected pass count.
+
+```lisp
+(module WeatherFetcher
+  (extern defun http-fetch ((url : Str)) : Str @capability "http.fetch")
+
+  (defun extract-temp ((body : Str)) : Num
+    (return (str.to_num (str.substring body
+      (+ (str.index_of body "temp") 7) 4))))
+
+  (test fetches-and-parses
+    (mocks (http-fetch "https://api.example.com/weather"
+                       "{\"temp\": 21.5, \"city\": \"Amsterdam\"}"))
+    (assert-eq (extract-temp (http-fetch "https://api.example.com/weather")) 21.5))
+
+  (sys.stdout.write (extract-temp (http-fetch "https://api.example.com/weather"))))
+```
+
+```bash
+agc compile samples/WeatherFetcher.ag --allow-http    # compile (tests-passed 1/1)
+agc verify  ./WeatherFetcher                          # human-readable manifest
+agc inspect ./WeatherFetcher                          # raw JSON manifest
+```
+
+The `agc verify` output:
+```
+Agentic binary manifest (schema 1.0)
+  Source hash  : 5c0c12908c3b7fd6…
+  Capabilities : http.fetch
+  Permissions  : http
+  Tests        : 1 (compile-time passes: 1)
+    - fetches-and-parses
+  Contracts    : 0
+```
+
 ## CLI Reference
 
 ```
 agc compile <file.ag|dir/>        Compile to native binary
 agc check <file.ag|dir/>          Type-check and run tests only
+agc verify <binary>               Extract & print embedded proof manifest
+agc inspect <binary>              Dump the raw manifest JSON
 agc agent <file.ag>               LLM-assisted compilation from constraint spec
 agc agent "build me a ..."        Intent-driven: LLM writes .ag, compiler verifies
 
@@ -165,6 +203,9 @@ Options:
   --allow-file                    Allow file I/O operations
   --allow-http                    Allow HTTP/server operations
   --allow-env                     Allow reading environment variables
+  --allow-db                      Allow SQLite database operations
+  --allow-time                    Allow reading the system clock
+  --allow-process                 Allow spawning subprocesses
 ```
 
 ## Project Structure
@@ -183,7 +224,11 @@ Agentic.Core.Tests/    Test suite (272 tests)
 ## Requirements
 
 - .NET 8.0 SDK
-- `GEMINI_API_KEY` environment variable (for agent mode only)
+- LLM provider key (for agent mode only) — one of:
+  - `ANTHROPIC_API_KEY` (Claude Sonnet 4.6 by default; override with `ANTHROPIC_MODEL`)
+  - `OPENAI_API_KEY` (GPT-4o by default; override with `OPENAI_MODEL`)
+  - `GEMINI_API_KEY` (Gemini 2.5 Flash)
+- Force a provider with `AGENTIC_PROVIDER=anthropic|openai|gemini`; otherwise the first key present is used (Anthropic → OpenAI → Gemini).
 
 ## License
 

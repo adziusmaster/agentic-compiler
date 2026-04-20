@@ -223,19 +223,42 @@ static void RunCompile(string filePath, bool emitBinary, string outputFormat, Pe
     }
 }
 
+static IAgentClient? BuildAgentClient()
+{
+    string provider = (Environment.GetEnvironmentVariable("AGENTIC_PROVIDER") ?? "").ToLowerInvariant();
+    string? anthropic = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
+    string? openai   = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+    string? gemini   = Environment.GetEnvironmentVariable("GEMINI_API_KEY");
+
+    if (provider == "anthropic" && !string.IsNullOrWhiteSpace(anthropic))
+        return new AnthropicClient(anthropic, Environment.GetEnvironmentVariable("ANTHROPIC_MODEL") ?? "claude-sonnet-4-6");
+    if (provider == "openai" && !string.IsNullOrWhiteSpace(openai))
+        return new OpenAiClient(openai, Environment.GetEnvironmentVariable("OPENAI_MODEL") ?? "gpt-4o");
+    if (provider == "gemini" && !string.IsNullOrWhiteSpace(gemini))
+        return new AgentClient(gemini);
+
+    // Auto-select by whichever key is present (priority: Anthropic → OpenAI → Gemini).
+    if (!string.IsNullOrWhiteSpace(anthropic))
+        return new AnthropicClient(anthropic, Environment.GetEnvironmentVariable("ANTHROPIC_MODEL") ?? "claude-sonnet-4-6");
+    if (!string.IsNullOrWhiteSpace(openai))
+        return new OpenAiClient(openai, Environment.GetEnvironmentVariable("OPENAI_MODEL") ?? "gpt-4o");
+    if (!string.IsNullOrWhiteSpace(gemini))
+        return new AgentClient(gemini);
+
+    return null;
+}
+
 static async Task RunLegacyAgent(string filePath)
 {
     var parser = new ConstraintParser();
     var profile = parser.Parse(filePath);
 
-    string? apiKey = Environment.GetEnvironmentVariable("GEMINI_API_KEY");
-    if (string.IsNullOrWhiteSpace(apiKey))
+    IAgentClient? agent = BuildAgentClient();
+    if (agent is null)
     {
-        Console.WriteLine("\n[FATAL] GEMINI_API_KEY missing.");
+        Console.WriteLine("\n[FATAL] No LLM provider key set. Provide ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY.");
         return;
     }
-
-    IAgentClient agent = new AgentClient(apiKey);
     var pipeline = new PipelineOrchestrator(agent, maxAttempts: 3, log: Console.WriteLine);
 
     Console.WriteLine($"[ORCHESTRATOR] Loaded: {profile.Name}\n[CONSTRAINT] {profile.Objective}\n");
@@ -288,10 +311,10 @@ static async Task RunIntentAgent(string intent, bool emitBinary, string outputFo
         return;
     }
 
-    string? apiKey = Environment.GetEnvironmentVariable("GEMINI_API_KEY");
-    if (string.IsNullOrWhiteSpace(apiKey))
+    IAgentClient? agent = BuildAgentClient();
+    if (agent is null)
     {
-        Console.WriteLine("\n[FATAL] GEMINI_API_KEY missing.");
+        Console.WriteLine("\n[FATAL] No LLM provider key set. Provide ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY.");
         return;
     }
 
@@ -309,7 +332,6 @@ static async Task RunIntentAgent(string intent, bool emitBinary, string outputFo
     if (autoGranted.Count > 0)
         Console.WriteLine($"[PERMISSIONS] Auto-granted from intent: {string.Join(", ", autoGranted)}");
 
-    IAgentClient agent = new AgentClient(apiKey);
     var workflow = new AgentWorkflow(agent, maxAttempts: 5, emitBinary: emitBinary, permissions: permissions, log: Console.WriteLine);
 
     Console.WriteLine($"[INTENT] {intent}\n");

@@ -4,13 +4,16 @@ using Agentic.Core.Agent;
 
 namespace Agentic.Core.Execution;
 
-public sealed class AgentClient : IAgentClient
+/// <summary>
+/// IAgentClient implementation backed by the Anthropic Messages API.
+/// </summary>
+public sealed class AnthropicClient : IAgentClient
 {
     private readonly HttpClient _httpClient;
     private readonly string _apiKey;
     private readonly string _model;
 
-    public AgentClient(string apiKey, string model = "gemini-2.5-flash")
+    public AnthropicClient(string apiKey, string model = "claude-sonnet-4-6")
     {
         _httpClient = new HttpClient();
         _apiKey = apiKey;
@@ -24,17 +27,17 @@ public sealed class AgentClient : IAgentClient
         string? previousError = null,
         CancellationToken cancellationToken = default)
     {
-        string url = $"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent?key={_apiKey}";
-
         string combinedPrompt = previousCode == null
             ? userConstraint
             : $"{userConstraint}\n\n[CRITICAL SYSTEM FAULT]\nYour previous attempt produced this S-expression:\n\n{previousCode}\n\nIt failed with this diagnostic:\n{previousError}\n\nStudy the fault in your own code above. Return ONLY a corrected, structurally valid S-expression that satisfies all constraints and passes every test.";
 
         var payload = new
         {
-            systemInstruction = new { parts = new[] { new { text = systemPrompt } } },
-            contents = new[] { new { role = "user", parts = new[] { new { text = combinedPrompt } } } },
-            generationConfig = new { temperature = 0.0 }
+            model = _model,
+            max_tokens = 4096,
+            system = systemPrompt,
+            messages = new[] { new { role = "user", content = combinedPrompt } },
+            temperature = 0.0
         };
 
         string jsonPayload = JsonSerializer.Serialize(payload);
@@ -42,8 +45,14 @@ public sealed class AgentClient : IAgentClient
         int maxRetries = 3;
         for (int i = 0; i < maxRetries; i++)
         {
-            var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
-            var response = await _httpClient.PostAsync(url, content, cancellationToken);
+            var request = new HttpRequestMessage(HttpMethod.Post, "https://api.anthropic.com/v1/messages")
+            {
+                Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json")
+            };
+            request.Headers.Add("x-api-key", _apiKey);
+            request.Headers.Add("anthropic-version", "2023-06-01");
+
+            var response = await _httpClient.SendAsync(request, cancellationToken);
 
             if (response.IsSuccessStatusCode)
             {
@@ -51,16 +60,15 @@ public sealed class AgentClient : IAgentClient
                 using var doc = JsonDocument.Parse(responseString);
 
                 string rawOutput = doc.RootElement
-                    .GetProperty("candidates")[0]
-                    .GetProperty("content")
-                    .GetProperty("parts")[0]
+                    .GetProperty("content")[0]
                     .GetProperty("text")
                     .GetString() ?? string.Empty;
 
                 return AgentClientHelpers.CleanMarkdown(rawOutput);
             }
 
-            if (response.StatusCode == System.Net.HttpStatusCode.ServiceUnavailable || response.StatusCode == (System.Net.HttpStatusCode)429)
+            if (response.StatusCode == System.Net.HttpStatusCode.ServiceUnavailable
+                || response.StatusCode == (System.Net.HttpStatusCode)429)
             {
                 Console.WriteLine($"  [API JITTER] {response.StatusCode}. Retrying in 2 seconds...");
                 await Task.Delay(2000, cancellationToken);
@@ -68,9 +76,9 @@ public sealed class AgentClient : IAgentClient
             }
 
             string error = await response.Content.ReadAsStringAsync(cancellationToken);
-            throw new Exception($"API Failure: {response.StatusCode} - {error}");
+            throw new Exception($"Anthropic API Failure: {response.StatusCode} - {error}");
         }
 
-        throw new Exception("Agent API failed after maximum retries.");
+        throw new Exception("Anthropic API failed after maximum retries.");
     }
 }
