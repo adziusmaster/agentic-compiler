@@ -232,4 +232,4 @@ Agentic.Core.Tests/    Test suite (272 tests)
 
 ## License
 
-Proprietary — see [LICENSE](LICENSE).
+Source-available — free for personal use, research, and evaluation. Commercial use requires a separate license. See [LICENSE](LICENSE).

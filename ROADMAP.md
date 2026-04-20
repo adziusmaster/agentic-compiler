@@ -9,30 +9,55 @@ thesis. It supersedes the in-flight `Stage 1 / 2 / 3` plan from
 
 The claim worth defending:
 
-> A compiler can isolate LLM-authored code to an audit-sized, capability-gated
-> DSL while preserving access to the host ecosystem through typed contracts.
-> The resulting native binary carries its own tests, contracts, and capability
-> manifest, so its behavior can be re-verified from the artifact alone — no
-> trust in the generation process required.
+> AgenticCompiler is the first AOT-compiled language purpose-built for LLM
+> authorship. Its S-expression surface is small enough for an agent to
+> generate correctly, its test-gated hermetic compiler refuses to emit a
+> binary that fails a declared test, and every I/O action is a declared,
+> permission-gated capability.
+>
+> The compiled binary carries a manifest of its source, tests, capabilities,
+> and contracts, and is accepted by an **independent minimal-TCB checker
+> (`agc-check`)** against a formal safety policy. If the checker accepts, the
+> binary is guaranteed — against a reference operational semantics — to:
+> (a) invoke only declared capabilities,
+> (b) pass its embedded tests in the reference semantics, and
+> (c) honor its `require` / `ensure` contracts on every reachable path.
 
-This reframes the project away from competing with Cursor/AlphaCodium/Devin on
-task pass-rate, and toward a niche that is genuinely underexplored:
-**proof-carrying LLM code**. Success criterion: a human auditor can certify a
-200-line `.ag` program faster than the equivalent Python, and the capability
-manifest guarantees no surprise I/O.
+This is **verification-condition proof-carrying code** (Tier B PCC), not a
+self-attested manifest: the checker is a separate binary with ~1 k LOC and no
+dependency on the compiler, so trust collapses onto the checker and the
+formal semantics, not onto the generator.
+
+The project occupies a niche no other language targets directly: existing
+AI-oriented languages (Mojo, Bend, Codon) optimize for performance or
+parallelism, not agent-safety; existing agent-coding tools (Cursor, Devin,
+Aider) are tools over general-purpose languages, not languages. Success
+criterion: a human auditor can certify a 200-line `.ag` program faster than
+the equivalent Python *and* can run `agc-check` to mechanically confirm that
+the certification still holds on any binary claiming to be built from that
+source.
 
 ### Candidate paper framings
 
-- "Proof-Carrying LLM Code: A Compiler for Auditable AI-Authored Programs"
-- "Capability-Gated LLM Synthesis: Isolating AI Logic Behind a Typed FFI"
-- "Small-Surface DSLs as a Substrate for Trustworthy LLM Code Generation"
+- "AgenticCompiler: A Proof-Carrying Native Language for LLM-Authored Code"
+- "Capability-Gated LLM Synthesis with an Independent Verifier"
+- "Verification-Condition PCC for Hermetically-Verified Agent Programs"
 
 Pick a framing once the evaluation (Arc D) results are in; do not pre-commit.
 
 ## Structure
 
-Four arcs. A–C are the technical contribution; D is the paper. A and C are on
-the critical path. B strengthens the claims. D is mandatory.
+Five arcs. A–C + E are the technical contribution; D is the paper.
+A, C, and E are on the critical path. B strengthens the quantitative claims.
+D is mandatory.
+
+- **Arc A** — Decomposition unblockers (type plumbing, capability breadth).
+- **Arc B** — Hierarchical decomposition + reflection loop.
+- **Arc C** — Capability FFI, permission gate, proof-carrying artifacts, and
+  the **independent checker `agc-check`** that makes PCC real.
+- **Arc E** — Formal foundations: operational semantics, type-and-effect
+  system, soundness sketch. Makes Arc C's guarantees mean something.
+- **Arc D** — Benchmark, auditability study, paper.
 
 Each stage lists:
 
@@ -118,6 +143,50 @@ crosses function boundaries.
 returns a function.
 
 **Paper hook.** The DSL supports compositional idioms LLMs naturally produce.
+
+### A4 — Capability registry breadth
+
+**Objective.** The registry covers enough real-world I/O surface to make the
+evaluation credible. Current registry (http.fetch, time.now_unix) is a demo.
+
+**Deliverables.**
+
+- Extend `DefaultCapabilities.BuildTrusted()` with:
+  - `file.read` (permission: `file`) — reads UTF-8 text; mock-safe adapter.
+  - `file.write` (permission: `file`) — atomic write; mock-safe adapter.
+  - `env.get` (permission: `env`) — reads environment variable.
+  - `db.query` (permission: `db`) — SQLite query; mock returns rows.
+  - `process.spawn` (permission: `process`) — runs subprocess, returns
+    stdout + exit code; mock returns pre-canned output.
+- Each capability: registered with param/return `AgType`s, emit-expression
+  for the transpiler, permission string, and a mock-safe adapter.
+- Samples: one `.ag` file per capability that exercises the capability
+  under a `(mocks …)` clause and through `--allow-*` for real I/O.
+- Tests: `CapabilityRegistryBreadthTests` — each capability parses,
+  permission-gates, and runs against mocks.
+
+**Acceptance.** The benchmark suite (D1) can cover capability-using problems
+beyond HTTP without stubbing the registry per-problem.
+
+**Paper hook.** Capability coverage is breadth-of-ecosystem, not a demo.
+
+### A5 — Stdlib/test consistency audit
+
+**Objective.** Close remaining test/impl mismatches so the test suite is a
+trustworthy regression signal for Arc D.
+
+**Deliverables.**
+
+- Fix `JsonGet_MissingKey_ShouldFail` — decide: either `json.get` throws on
+  missing key (align implementation), or the test is wrong (align test).
+  Document the chosen semantics in `LanguageSpec.cs`.
+- Sweep remaining stdlib modules for similar mismatches; no red tests.
+- Update CLAUDE guidance in `ROADMAP.md` "Open questions" if a decision was
+  load-bearing.
+
+**Acceptance.** `dotnet test` passes 100 %; no skipped tests.
+
+**Paper hook.** Hygiene — reviewers will grep `dotnet test` output.
 
 ## Arc B — Hierarchical decomposition and iterative refinement
 
@@ -326,6 +395,260 @@ machine B with no access to the source.
 
 **Paper hook.** "Proof-carrying" is literal; the artifact is the proof.
 
+### C5 — Formal safety policy
+
+**Objective.** Write down — precisely — what `agc-check` guarantees. Without
+this, Arc C is a collection of engineering conveniences, not a theorem.
+
+**Deliverables.**
+
+- `docs/safety-policy.md` — a specification of the three guarantees the
+  checker delivers:
+  1. **Capability soundness.** Every syscall the program makes corresponds
+     to a capability declared in the manifest.
+  2. **Test conformance.** Every `(test …)` in the manifest, re-run in the
+     reference semantics against the manifest-embedded source, passes.
+  3. **Contract validity.** Every `require` holds at every call site and
+     every `ensure` holds at every return site, in the reference
+     semantics.
+- Explicit non-goals: termination, functional equivalence between `.ag` and
+  emitted binary outside of declared tests, memory safety (C# AOT gives
+  us that free), side-channel resistance.
+- Rename cleanup: in README and manifest, use "proof-carrying" only where
+  the above guarantees apply; use "capability manifest" elsewhere.
+
+**Acceptance.** The policy is short (one page), precise (each property is
+stated as a condition on a tuple `(binary, source, manifest)`), and
+internally consistent (no property depends on a guarantee the checker
+can't provide).
+
+**Paper hook.** Section 3.1 of the paper is this document.
+
+### C6 — Binary-hash binding in manifest
+
+**Objective.** Detect post-emission tampering: if anyone edits the binary
+after compilation, `agc verify` / `agc-check` must reject it.
+
+**Deliverables.**
+
+- `NativeEmitter.Emit` computes SHA256 of the emitted binary file after the
+  final link step and stores it in the manifest as `BinaryHash`.
+- Two-hash binding:
+  - `SourceHash` — SHA256 of `.ag` source (already present).
+  - `BinaryHash` — SHA256 of the binary file at emission time.
+- `agc verify <bin>` recomputes SHA256 of the binary on disk, compares to
+  `BinaryHash` in the manifest, fails if mismatch.
+- Tests: tamper with a bit in the emitted binary → `agc verify` exits
+  non-zero with `binary-tampered` diagnostic.
+
+**Acceptance.** Round-trip: compile → hash → ship → re-verify on a
+different machine → pass. Tamper any byte → fail.
+
+**Paper hook.** Closes the "manifest is self-attested" critique: the
+manifest binds to a specific byte-exact binary.
+
+### C7 — Independent checker `agc-check`
+
+**Objective.** Build the checker. It must be a separate binary, have no
+dependency on `Agentic.Core`'s transpiler, and be small enough to audit.
+
+**Deliverables.**
+
+- New project `Agentic.Check/` — console app. Dependencies: only
+  `System.Text.Json` and `System.Security.Cryptography` from BCL. No
+  reference to `Agentic.Core`, `Agentic.Cli`, or any stdlib module that
+  performs I/O beyond file-read.
+- `Agentic.Check/Parser.cs` — mini S-expr parser, ~200 LOC. Reads the
+  Agentic subset needed to re-run tests; rejects anything it does not
+  recognize.
+- `Agentic.Check/ReferenceInterpreter.cs` — evaluator implementing the
+  operational semantics from E1. Covers the subset used by `(test …)`
+  bodies: numbers, strings, bools, arithmetic, comparisons, arrays, maps,
+  defun, defstruct, `assert-eq` / `assert-true` / `assert-near`, `require`,
+  `ensure`, and capability calls resolved through **mocks declared in the
+  manifest** (never real I/O).
+- `Agentic.Check/CapabilityExtractor.cs` — extracts capability call sites
+  from the emitted binary by scanning for the transpiler's
+  `CSharpEmitExpr` signatures (documented per-capability). Output: a set
+  of capability names actually invoked by the binary.
+- Checker CLI:
+  `agc-check <binary> [--source <file.ag>] [--policy safety|strict]`
+  - Reads manifest from binary (`<binary> --verify`).
+  - If `--source` supplied: recomputes SHA256 of source, compares to
+    `SourceHash` in manifest, fails on mismatch.
+  - Recomputes SHA256 of binary, compares to `BinaryHash`, fails on
+    mismatch.
+  - Runs `CapabilityExtractor` on the binary, compares to manifest
+    `Capabilities` — fails if binary invokes anything not declared.
+  - For each manifest `Tests[i]`, runs the reference interpreter against
+    the source subset and confirms the test passes.
+  - For each manifest `Contracts[i]`, re-runs the contract check against
+    the reference semantics.
+  - Exits 0 with a structured report on full pass; non-zero on any fail.
+- Tests (in `Agentic.Check.Tests/`):
+  - Happy path: sample compiles, checker accepts.
+  - Capability tamper: edit manifest to drop a declared capability while
+    the binary still calls it → checker rejects.
+  - Test tamper: edit manifest to claim more tests passed than exist →
+    checker rejects.
+  - Source mismatch: supply wrong `.ag` file → checker rejects.
+  - Binary mismatch: flip a bit → checker rejects.
+
+**Acceptance.** Checker LOC ≤ 1500, runtime dependencies ≤ BCL only,
+every negative test above rejects with a distinct diagnostic code.
+
+**Paper hook.** This *is* the independent-checker claim. Section 4 of the
+paper.
+
+### C8 — VC emission for contracts and tests
+
+**Objective.** Tests and contracts in the manifest are self-contained
+verification conditions — the checker can evaluate them without access to
+the source beyond what the manifest embeds.
+
+**Deliverables.**
+
+- Extend `ProofManifest` with:
+  - Per test: the **inline source snippet** (already present) plus a
+    **capability-mock map** as structured data, not embedded inside a
+    `(mocks …)` S-expr string.
+  - Per contract: the enclosing function's full AST, plus the contract
+    expression, both as structured JSON (the checker parses this, not
+    arbitrary `.ag`).
+- Transpiler: on emit, walks the AST and writes the above to the manifest.
+- Checker: validates each VC by feeding the embedded AST to the reference
+  interpreter.
+- Tests: a `.ag` file with 3 contracts and 2 tests → manifest contains
+  exactly those 5 VCs → checker accepts.
+
+**Acceptance.** The checker needs only `(binary, manifest)` — optional
+`--source` is a second line of defense, not a prerequisite. Running
+`agc-check <bin>` (no `--source`) still validates tests and contracts.
+
+**Paper hook.** This is where "verification-condition" earns the name.
+
+### C9 — TCB audit document
+
+**Objective.** Reviewers will ask: "what do I have to trust?" Answer it in
+writing.
+
+**Deliverables.**
+
+- `docs/tcb.md` — enumerates:
+  - Lines of code in `Agentic.Check/` (target: ≤ 1500).
+  - Every external dependency (should be only `System.Text.Json`,
+    `System.Security.Cryptography`).
+  - Every I/O capability the checker itself uses (only file-read for
+    binary + source + manifest).
+  - Every axiom the soundness argument depends on (e.g., "the emitted C#
+    faithfully implements the reference semantics for the subset declared
+    in the manifest" — see Arc E for how far this can be tightened).
+  - Attack surface: what a malicious compiler / binary / manifest can and
+    cannot achieve against the checker.
+- CI check: fail the build if `Agentic.Check/` LOC exceeds the budget.
+
+**Acceptance.** A reviewer can, in 30 minutes, read the TCB doc and
+understand exactly what to trust. The document is one file, not a tour
+of the codebase.
+
+**Paper hook.** Section 4.3 — "What the checker trusts." A reviewer-facing
+answer to every soundness question in advance.
+
+## Arc E — Formal foundations
+
+Arc C delivers an independent checker. Arc E makes its verdict *mean*
+something by grounding it in a formal semantics against which "test passes"
+and "contract holds" are defined. Paper-level — no mechanization required
+for the submission draft; Coq / Lean is a follow-up.
+
+### E1 — Small-step operational semantics for core Agentic
+
+**Objective.** A reference semantics for the subset used by `agc-check`.
+Clear, inspectable, one document.
+
+**Deliverables.**
+
+- `docs/semantics.md` — small-step SOS rules for the core subset:
+  - Values: `Num`, `Str`, `Bool`, `Array`, `Map`, `Record`, closure.
+  - Expressions: arithmetic, comparisons, `if`, `while`, `def`, `set`,
+    `defun` (first-order only for E1), `defstruct`, `return`, function
+    call, capability call, `assert-eq` / `assert-true` / `assert-near`,
+    `require`, `ensure`, `(mocks …)`.
+  - Explicit out-of-scope for E1: higher-order functions, modules,
+    imports. These return in E2 as extensions with their own sections.
+- Each rule stated as `E, σ → E', σ'` with the store `σ` capturing the
+  environment + mock frame.
+- Capability-call rule: `(f args) → v` iff `(f, firstArg) ∈ σ.mocks` and
+  `σ.mocks[(f, firstArg)] = v`. Unmocked capability calls are **stuck**
+  (not undefined; this is deliberate — mocks are the semantics for
+  testing, real I/O has a separate rule guarded by `AllowRealIo`).
+
+**Acceptance.** Every construct the checker's reference interpreter uses
+has a corresponding rule. The interpreter is a faithful implementation of
+the document.
+
+**Paper hook.** Section 5 (Formalism).
+
+### E2 — Type-and-capability-effect system
+
+**Objective.** A typing judgment `Γ ⊢ e : τ ! Φ` where `Φ` is the set of
+capabilities the expression may invoke. Arc C's checker uses this to
+reject any binary whose `Φ` exceeds the manifest-declared capability set.
+
+**Deliverables.**
+
+- Typing rules for the core subset.
+- Effect-extension rule: every call to `(extern defun f …)` with
+  `@capability c` adds `c` to `Φ`.
+- Soundness statement: if `Γ ⊢ e : τ ! Φ` and `e → e'`, then
+  `Γ ⊢ e' : τ ! Φ'` with `Φ' ⊆ Φ` (progress + preservation +
+  effect-monotonicity).
+- On-paper proof sketch for the core subset (no HOF, no modules).
+- Extension stubs for HOF (E2.1) and modules (E2.2) — out of scope for
+  the first paper, but state the extension clearly so the reviewer sees
+  the roadmap.
+
+**Acceptance.** Proof sketch is tight enough that a reviewer believes it.
+Not yet mechanized — that is E4 (post-paper).
+
+**Paper hook.** Section 5.2. The effect system is the formal counterpart
+of the capability manifest.
+
+### E3 — Soundness sketch tying E2 to `agc-check`
+
+**Objective.** State and argue the top-level theorem: if `agc-check`
+accepts, the three policy guarantees from C5 hold.
+
+**Deliverables.**
+
+- `docs/soundness.md` — theorem statement:
+  > **Theorem (agc-check soundness).** For any tuple `(binary, source,
+  > manifest)`, if `agc-check` accepts then:
+  > 1. (Capability soundness) every syscall the binary makes corresponds
+  >    to a capability `c` with `c ∈ manifest.Capabilities`.
+  > 2. (Test conformance) for every `t ∈ manifest.Tests`, `t` passes in
+  >    the reference semantics `→*` defined in E1.
+  > 3. (Contract validity) for every `(require r)` / `(ensure e)` in
+  >    `manifest.Contracts`, the condition holds on every execution path
+  >    in the reference semantics.
+- Proof sketch per clause:
+  - (1) reduces to `CapabilityExtractor` correctness + E2 effect
+    soundness.
+  - (2) reduces to reference-interpreter faithfulness to E1.
+  - (3) reduces to (2) applied to each contract as a test.
+- Explicit assumptions, each flagged as **trust-assumption**:
+  - The emitted C# implements E1 semantics for the manifest subset.
+  - `CapabilityExtractor`'s pattern set covers every capability emit
+    expression registered in `DefaultCapabilities`.
+  - SHA256 is collision-resistant for the input sizes we care about.
+
+**Acceptance.** The soundness document is reviewable in 1 hour. Every
+trust-assumption is either (a) cited to prior art (e.g., SHA256), or
+(b) listed as future work to close (e.g., mechanized proof of emitter
+faithfulness).
+
+**Paper hook.** Section 5.3 — the theorem that the paper's title promises.
+
 ## Arc D — Evaluation and paper
 
 ### D1 — Benchmark suite designed around the thesis
@@ -380,37 +703,61 @@ Venue options (decide after results):
 
 ## Critical path and sequencing
 
+**Status (2026-04-20):** A1–A3, B1, B3, B4 (exists as PipelineOrchestrator),
+C1–C4, multi-provider client — **done**. The remaining critical path is:
+
 ```
-A1 (canonical serialization) ─┐
-A2 (type plumbing)            ├─► B1 (reflection) ─► B2 (Planner)
-A3 (higher-order)             ─┘                            │
-                                                            ▼
-                                                    B3 (hierarchical)
+A5 (test hygiene) ──┐
+A4 (cap breadth) ──┤
+                   ▼
+                  C5 (safety policy) ──► C6 (binary hash) ──┐
                                                             │
                                                             ▼
-                                                    B4 (retrieval)
-
-C1 (capabilities) ─► C2 (permissions) ─► C3 (mocks) ─► C4 (proof-carrying)
+E1 (semantics) ──► E2 (effects) ────► C7 (agc-check) ──► C8 (VC emission) ──► C9 (TCB audit)
+                                                            │
+                                                            ▼
+                                                    E3 (soundness sketch)
+                                                            │
+                                                            ▼
+                                                    B2 (autonomous planner)
+                                                            │
+                                                            ▼
+                                                    D1 (benchmarks, 30 problems)
+                                                            │
+                                                            ▼
+                                                    D2 (auditability study)
+                                                            │
+                                                            ▼
+                                                        D3 (paper)
 ```
 
-Arcs A and C can proceed in parallel. B depends on A. D depends on all.
+Arcs A-hygiene and E1 can run in parallel at the start. C7 is the single
+longest-pole engineering task after the prereqs; C8 follows directly. E3
+can be drafted while C7/C8 are in flight and finalized once the checker
+exists.
 
-**Minimum viable paper.** A1–A3 + B1, B2 + C1–C4 + D. B3 and B4 strengthen
-the quantitative claim but can defer to a follow-up if time is tight.
+**Minimum viable paper.** A4 + A5 + C5–C9 + E1–E3 + D1 + D2 + D3. B2
+strengthens the decomposition claim but can defer to a follow-up venue if
+the bench timeline binds first.
 
 **Suggested order of execution (two-track).**
 
-1. Start A1 today — high leverage, 1–2 days.
-2. In parallel, spec C1 as a design doc. It touches many files; plan
-   before coding.
-3. Land A2, A3.
-4. Land C1 once A1/A2 are in — records/arrays across boundaries are
-   needed for realistic capabilities.
-5. B1 before B2 — reflection loop is infrastructure the Planner uses.
-6. B2, C2, C3 in parallel once B1 and C1 land.
-7. C4 last in Arc C — depends on everything else being stable.
-8. B3, B4, D1 in parallel once the core is done.
-9. D2, D3 at the end.
+1. Land A5 in a day — hygiene, unblocks CI signal.
+2. Start A4 and E1 in parallel — A4 is engineering (2 days), E1 is writing
+   (1 week). Different contexts, no conflict.
+3. Land C5 (formal policy) — 3 days. E1 informs the test-conformance
+   clause; do C5 after E1 has a first draft.
+4. Land C6 (binary hash) — 1 day. Gatekeeper for the checker.
+5. Draft E2 (effect system) while beginning C7. Both need ~1 week; they
+   inform each other.
+6. Land C7 (the checker) — the biggest task, ~2 weeks. Plan the project
+   layout and LOC budget on day 1 (see IMPLEMENTATION_PLAN.md).
+7. Land C8 (VC emission) directly after C7 — same context, ~1 week.
+8. Finalize E3 soundness doc — ties E2 + C7 + C8 together.
+9. C9 (TCB audit) — 2 days. Reviewer-facing, depends on C7 being frozen.
+10. B2 (autonomous planner) — optional for the first paper; schedule
+    based on remaining time before D1 kickoff.
+11. D1 → D2 → D3 per the original plan.
 
 ## Open questions and risks
 
@@ -428,10 +775,29 @@ This is itself paper-worthy if you can prove a property.
 to models that write whole programs in one shot. The benchmark must be
 designed for the thesis, not inherited.
 
-**Single-provider coupling.** Currently Gemini-only. Before publication,
-factor `IAgentClient` into a provider-agnostic interface with at least
-one additional backend (Anthropic or OpenAI). Otherwise the work looks
-like "a Gemini feature."
+**Single-provider coupling.** Resolved — `AgentClient` / `AnthropicClient` /
+`OpenAiClient` all implement `IAgentClient`, and the CLI auto-selects based
+on the first API key present (priority Anthropic → OpenAI → Gemini),
+overridable with `AGENTIC_PROVIDER`.
+
+**TCB blowup.** The checker must stay small (target ≤ 1500 LOC, BCL-only
+dependencies). Every feature pushed into `agc-check` costs us credibility.
+If a feature is tempting but grows the checker — push it into the compiler
+and out of the TCB instead, and add a trust-assumption to `docs/tcb.md`
+rather than extending the checker.
+
+**Emitter-semantics gap.** E2 gives us an effect system for `.ag`; the
+checker reads capabilities out of the emitted binary. The bridge —
+"the emitted C# implements E1 semantics for the manifest subset" — is an
+axiom in the first paper, not a theorem. State it clearly as future work.
+Closing it (via a Coq-mechanized emitter or an equivalence-checking tool)
+is a follow-up paper on its own.
+
+**Non-determinism in emission.** If `dotnet publish` produces
+bit-different binaries across machines for the same source,
+`BinaryHash` binding is useless for cross-machine verification. Measure
+this early in C6 and document. Fallback: bind the hash per-emission, not
+per-source, and rely on `SourceHash` for cross-machine claims.
 
 **Scope creep.** Every arc has tempting adjacent work (IDE plugin, LSP,
 debugger, REPL). Ruthlessly defer — none of that is on the paper critical
@@ -440,12 +806,23 @@ path. Write them down in a "post-paper" section and stop.
 ## Definitions of "done"
 
 - **Arc A** done when all helpers in all existing samples can be typed
-  with non-`double` params and the canonical serializer round-trips every
-  `AgType`.
+  with non-`double` params, the canonical serializer round-trips every
+  `AgType`, the capability registry covers file / env / db / process /
+  time / http, and the test suite is green.
 - **Arc B** done when a bare objective produces a multi-module,
   multi-helper program with zero author-declared structure, verified
-  against acceptance tests.
-- **Arc C** done when `agc verify <binary>` on a compiled artifact
-  re-runs tests and prints the capability set, with no access to source.
+  against acceptance tests. (Today: reflection + pipeline exist; B2
+  autonomous planner is the remaining bar.)
+- **Arc C** done when `agc-check <binary>` — a separate binary with
+  ≤ 1500 LOC and BCL-only dependencies — accepts a compiled artifact
+  and, on tampering the binary or manifest, rejects with a distinct
+  diagnostic code for each of: source-hash mismatch, binary-hash
+  mismatch, undeclared capability, failing embedded test, violated
+  contract. The `docs/tcb.md` and `docs/safety-policy.md` are both
+  committed and internally consistent.
+- **Arc E** done when `docs/semantics.md`, `docs/effects.md`, and
+  `docs/soundness.md` are committed, cross-referenced, and match the
+  implementation of `agc-check`'s reference interpreter. Every
+  trust-assumption is listed in `docs/tcb.md`.
 - **Arc D** done when a draft paper, reproducible benchmark, and
   auditability-study data are all committed to the repo.
