@@ -1,0 +1,13 @@
+(module ProcessSpawnDemo
+  ; A4: process.spawn capability via extern defun. Compile with --allow-process.
+  ; Runs a shell command, returns captured stdout.
+  (extern defun run-cmd ((cmd : Str)) : Str @capability "process.spawn")
+
+  (defun trimmed-echo ((message : Str)) : Str
+    (return (str.trim (run-cmd (str.concat "echo " message)))))
+
+  (test trims-stdout
+    (mocks (process.spawn "echo hello" "hello\n"))
+    (assert-eq (trimmed-echo "hello") "hello"))
+
+  (sys.stdout.write (trimmed-echo "hello")))

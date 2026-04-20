@@ -169,11 +169,14 @@ Tests still run at compile time. Only route registration + listen are server-spe
 
 ## JSON (import std.json)
 ```
-(json.get json_str key)         ; extract string value by key
-(json.get_num json_str key)     ; extract numeric value by key
+(json.get json_str key)         ; extract string value by key (returns """" if missing)
+(json.get_num json_str key)     ; extract numeric value by key (returns 0.0 if missing)
 (json.object k1 v1 k2 v2 …)    ; build JSON object from key-value pairs
 (json.array_length json_str)    ; count elements in JSON array → Num
 ```
+Missing-key semantics: `json.get` / `json.get_num` return a safe default rather
+than throwing. Use `(if (str.eq v """") …)` or explicit presence checks when
+distinguishing missing from empty matters.
 
 ## Environment Variables — requires --allow-env
 ```

@@ -1,0 +1,12 @@
+(module FileWriteDemo
+  ; A4: file.write capability via extern defun. Compile with --allow-file-write.
+  (extern defun write-text ((path : Str) (body : Str)) : Num @capability "file.write")
+
+  (defun save-report ((path : Str) (count : Num)) : Num
+    (return (write-text path (str.concat "count=" (str.from_num count)))))
+
+  (test writes-report
+    (mocks (file.write "/tmp/report.txt" 1))
+    (assert-eq (save-report "/tmp/report.txt" 42) 1))
+
+  (sys.stdout.write (save-report "/tmp/report.txt" 7)))

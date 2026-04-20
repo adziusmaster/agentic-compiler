@@ -1,0 +1,14 @@
+(module DbQueryDemo
+  ; A4: db.query capability via extern defun. Compile with --allow-db.
+  ; Runs a scalar SQL against a SQLite connection string, returns the first
+  ; column of the first row as Str.
+  (extern defun sql-scalar ((conn : Str) (sql : Str)) : Str @capability "db.query")
+
+  (defun count-users ((conn : Str)) : Num
+    (return (str.to_num (sql-scalar conn "SELECT COUNT(*) FROM users"))))
+
+  (test counts-users-from-mock
+    (mocks (db.query "Data Source=:memory:" "3"))
+    (assert-eq (count-users "Data Source=:memory:") 3))
+
+  (sys.stdout.write (count-users "Data Source=:memory:")))

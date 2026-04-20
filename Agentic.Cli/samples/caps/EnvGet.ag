@@ -1,0 +1,19 @@
+(module EnvGetDemo
+  ; A4: env.get capability via extern defun. Compile with --allow-env.
+  (extern defun env-read ((key : Str)) : Str @capability "env.get")
+
+  (defun home-or ((fallback : Str)) : Str
+    (def v (env-read "HOME"))
+    (if (str.eq v "")
+      (return fallback)
+      (return v)))
+
+  (test falls-back-when-empty
+    (mocks (env.get "HOME" ""))
+    (assert-eq (home-or "/nowhere") "/nowhere"))
+
+  (test uses-real-value-when-present
+    (mocks (env.get "HOME" "/root"))
+    (assert-eq (home-or "/nowhere") "/root"))
+
+  (sys.stdout.write (home-or "/nowhere")))

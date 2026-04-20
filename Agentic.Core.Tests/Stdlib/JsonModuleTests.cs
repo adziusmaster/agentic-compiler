@@ -80,17 +80,22 @@ public sealed class JsonModuleTests
     }
 
     [Fact]
-    public void JsonGet_MissingKey_ShouldFail()
+    public void JsonGet_MissingKey_ShouldReturnEmptyString()
     {
-        // Arrange
-        const string source = "(do (json.get \"{\\\"a\\\":1}\" \"missing\"))";
+        // Missing keys return "" by design — safe default, consistent with the
+        // transpiler's TryGetProperty emission path. See LanguageSpec "JSON" section.
+        const string source = "(do\n" +
+            "  (def data \"{\\\"a\\\":1}\")\n" +
+            "  (def missing (json.get data \"missing\"))\n" +
+            "  (test json-missing (assert-eq missing \"\")))";
+
         var compiler = new Compiler(emitBinary: false);
 
         // Act
         var result = compiler.Compile(source);
 
         // Assert
-        result.Success.Should().BeFalse();
+        result.Success.Should().BeTrue();
     }
 
     [Fact]

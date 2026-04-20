@@ -1,0 +1,15 @@
+(module FileReadDemo
+  ; A4: file.read capability via extern defun. Compile with --allow-file-read.
+  (extern defun read-text ((path : Str)) : Str @capability "file.read")
+
+  (defun first-line ((contents : Str)) : Str
+    (def nl (str.index_of contents "\n"))
+    (if (< nl 0)
+      (return contents)
+      (return (str.substring contents 0 nl))))
+
+  (test reads-first-line
+    (mocks (file.read "/etc/hostname" "alpha\nbeta\n"))
+    (assert-eq (first-line (read-text "/etc/hostname")) "alpha"))
+
+  (sys.stdout.write (first-line (read-text "/etc/hostname"))))

@@ -284,3 +284,66 @@ tight E3 and C7 turned out.
 Update this file weekly. Format: add a `## Week N actuals` section under
 "Ground rules". Record: what shipped, what slipped, LOC budget status,
 any assumptions rewritten.
+
+## Week 1 actuals (2026-04-20)
+
+**Shipped (engineering / Track E).**
+
+- **A5 — test hygiene.** `JsonGet_MissingKey_ShouldFail` renamed to
+  `JsonGet_MissingKey_ShouldReturnEmptyString`. Rationale added to
+  `LanguageSpec.cs` JSON section (missing-key semantics: safe default,
+  not throw). Single commit; suite moved from 323 → 323 passing (no
+  skips). _(Commit pending — unstaged.)_
+- **A4 — capability registry breadth.** `DefaultCapabilities.BuildTrusted()`
+  extended with five capabilities: `file.read`, `file.write`, `env.get`,
+  `db.query`, `process.spawn`. Each has ParamTypes / ReturnType /
+  Permission / Adapter / CSharpEmitExpr. `db.query` adapter stubs to
+  `NotSupportedException` (the real NuGet-backed path runs only inside
+  emitted binaries, not in the compiler process). Five samples under
+  `Agentic.Cli/samples/caps/`. Eleven tests in
+  `CapabilityRegistryBreadthTests` cover mocked happy path,
+  permission-denied transpile-time rejection, and unmocked-test
+  failure. Suite: 334 / 334 passing. All five samples compile
+  end-to-end to native binaries with the matching `--allow-*` flag and
+  fail cleanly with `permission-denied` without it. _(Commit pending.)_
+
+**Shipped (formalism / Track F).**
+
+- **E1 draft.** `docs/semantics.md` written (≈ 12 pages). Small-step
+  SOS rules for the subset: literals, arithmetic / comparisons, `if`,
+  `while`, `do`, `def` / `set`, first-order `defun` / `return`, record
+  creation / field access / `set-*`, capability calls under mocks,
+  mock frame semantics, assertions, tests, contracts. Evaluation
+  contexts factored out. Trust-assumptions and out-of-scope items
+  (HOF, modules, `try/catch`, `[cap-real]` in checker) explicitly
+  enumerated. Review checklist (§8) left partially unchecked — needs
+  walk-through of existing samples to confirm full coverage before the
+  Week 2 freeze.
+
+**Slipped.** None. Week 1 delivered exit for A5 (fully), A4 (fully —
+originally scheduled to spill into Week 2), and the E1 draft.
+
+**LOC budget status.** `Agentic.Check/` not yet created (Week 4).
+Documentation: `docs/semantics.md` ≈ 12 pages (budget 20). Healthy.
+
+**Assumptions rewritten.** None. No roadmap sections invalidated.
+
+**Risks surfaced during the week.**
+
+- `db.query` capability's real adapter can't live in `Agentic.Core`
+  because the compiler project does not link `Microsoft.Data.Sqlite`.
+  Mitigated by stubbing the adapter to throw; the real emit-expression
+  still works in the compiled binary where `NativeEmitter` detects the
+  `Microsoft.Data.Sqlite` string in the transpiled C# and auto-adds
+  the NuGet reference. Note in `docs/tcb.md` (Week 10) that the
+  adapter in the compiler and the adapter in the emitted binary are
+  *different code paths* — the checker (C7) only needs to reason
+  about the emit-expression.
+- `Compiler` uses a source-hash cache that masked the permission-gate
+  check during manual testing. Not a correctness bug, but it
+  complicated debugging. Kept as-is; documented here so future
+  debugging sessions clear `.agc-cache` first.
+
+**Next week.** A4 is done; Week 2 is now E1 freeze + start C5 (formal
+safety policy). E2 draft can begin in parallel.
+
