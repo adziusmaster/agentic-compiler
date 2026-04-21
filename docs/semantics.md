@@ -242,7 +242,59 @@ If `return` is reached outside a function frame the term is **stuck**
 Records are immutable; `set-fᵢ` returns a new record with the field
 replaced. Arity and type mismatches at `new` are **stuck**.
 
-### 4.10 Capability call under mocks
+### 4.10 Arrays (`arr.*`)
+
+Arrays are total finite tuples `⟨v₀, …, vₙ₋₁⟩`. Indexing is zero-based.
+Out-of-bounds access is **stuck** (checker rejects).
+
+```
+    n ∈ ℕ
+────────────────────────────────────  [arr-new]
+ (arr.new n), σ ⟶ ⟨0, 0, …, 0⟩_n, σ
+
+  0 ≤ i < n    v = vᵢ                        0 ≤ i < n    v̄' = v̄[i := v']
+──────────────────────────────────        ────────────────────────────────────────────  [arr-set]
+ (arr.get ⟨v̄⟩ i), σ ⟶ v, σ                  (arr.set ⟨v̄⟩ i v'), σ ⟶ ⟨v̄'⟩, σ
+ [arr-get]
+
+        |v̄| = n
+──────────────────────────────
+ (arr.length ⟨v̄⟩), σ ⟶ n, σ
+ [arr-len]
+```
+
+`arr.map`, `arr.filter`, and `arr.reduce` take a **named function
+reference** as their second argument. Because they evaluate that
+function at each element (i.e., higher-order application), they are
+**out of scope for E1** (see §6.4). C8 refuses to emit VCs for any test
+that contains a direct call to `arr.map` / `arr.filter` / `arr.reduce`
+— the program still compiles and runs, but the checker's test-conformance
+clause does not apply to those tests.
+
+### 4.11 Maps (`map.*`)
+
+Maps are total finite functions `{k̄ ↦ v̄}` with string keys.
+
+```
+──────────────────────────────────  [map-new]
+ (map.new), σ ⟶ {}, σ
+
+  m' = m ∪ {k ↦ v}                           m(k) = v                  k ∉ dom(m)
+─────────────────────────────────          ────────────────────────   ──────────────────────────  [map-default]
+ (map.set m k v), σ ⟶ m', σ                 (map.get m k), σ ⟶ v, σ    (map.get m k), σ ⟶ 0, σ
+ [map-set]                                  [map-get-hit]
+
+        k ∈ dom(m)                                   k ∉ dom(m)
+────────────────────────────────                ────────────────────────────────
+ (map.has m k), σ ⟶ 1, σ                        (map.has m k), σ ⟶ 0, σ
+ [map-has-t]                                    [map-has-f]
+```
+
+`map.get` on a missing key returns `0` (the numeric zero). Programs
+distinguishing "absent" from "present with value 0" should use
+`map.has` first.
+
+### 4.12 Capability call under mocks
 
 This is the rule that makes test semantics hermetic.
 
@@ -270,7 +322,7 @@ c ∈ σ.φ    real-adapter(c, v̄) = v    AllowRealIo = ⊤
  (c v̄), σ ⟶ v, σ
 ```
 
-### 4.11 Capability declaration (`extern defun`)
+### 4.13 Capability declaration (`extern defun`)
 
 ```
    c ∈ registry-permissions     c ∉ σ.φ
@@ -287,7 +339,7 @@ substituting `f` with `c`.
 A second attempt to declare the same `c` is a no-op (monotonicity).
 Declaring an `f` that collides with an in-scope variable is stuck.
 
-### 4.12 Mocks
+### 4.14 Mocks
 
 A mocks clause registers entries in the mock frame for the duration of
 the enclosing test.
@@ -301,7 +353,7 @@ the enclosing test.
 On exit from the enclosing `(test …)` block, the mock frame is popped
 to its pre-test value. This is enforced by [test] below.
 
-### 4.13 Assertions
+### 4.15 Assertions
 
 ```
 v₁ = v₂
@@ -324,7 +376,7 @@ IsTruthy(v) = ⊤                               IsTruthy(v) = ⊥
 Assertions never abort execution; they only log. The `(test …)` wrapper
 turns a non-empty failure log within the block into a test failure.
 
-### 4.14 Tests
+### 4.16 Tests
 
 ```
    σ₀ = σ[τ-scope opened, current-test := t]    σ' = σ₀ after ē
@@ -341,7 +393,7 @@ turns a non-empty failure log within the block into a test failure.
 the snapshot. This is what makes tests independent: mocks installed in
 one test do not leak into another.
 
-### 4.15 Contracts
+### 4.17 Contracts
 
 ```
 IsTruthy(v) = ⊤                               IsTruthy(v) = ⊥
@@ -366,11 +418,58 @@ of the function's body.
 ### 5.1 `str.*` and `math.*`
 
 Each `str.X` and `math.X` operation is defined by a metafunction
-`strₛ`/`mathₛ` that wraps the corresponding host BCL function. These
-functions are *pure* (no `σ` effect) and *total* (they return for every
-input in the type). The only impure path is `str.to_num` on a
-non-numeric string, which follows C# `double.Parse` semantics and may
-throw; the checker treats this as stuck (test fail).
+`strₛ` / `mathₛ` that wraps the corresponding host BCL function. These
+functions are *pure* (no `σ` effect). The congruence rule is the same
+for all of them:
+
+```
+       ops(v̄) = v
+────────────────────────────  [stdlib-op]
+ (op v̄), σ ⟶ v, σ
+```
+
+where `op ∈ dom(strₛ) ∪ dom(mathₛ)`. The metafunction tables below fix
+`ops` concretely. An input outside the domain (wrong arity, wrong type)
+is **stuck**; the checker logs a failure.
+
+#### 5.1.1 `strₛ` — string metafunctions
+
+| Operation          | Arity | Domain                   | Semantics                                                         |
+|--------------------|-------|--------------------------|-------------------------------------------------------------------|
+| `str.concat`       | 2     | (Str, Str) → Str         | `s₁ ++ s₂` (Unicode concatenation)                                |
+| `str.length`       | 1     | Str → Num                | number of UTF-16 code units (host `s.Length`)                     |
+| `str.trim`         | 1     | Str → Str                | remove leading + trailing whitespace (host `s.Trim()`)            |
+| `str.to_num`       | 1     | Str → Num                | `double.Parse(s, CultureInfo.Invariant)`; **stuck** if it throws  |
+| `str.from_num`     | 1     | Num → Str                | `n.ToString(CultureInfo.Invariant)`                               |
+| `str.substring`    | 3     | (Str, Num, Num) → Str    | host `s.Substring(i, len)`; **stuck** if `i+len > |s|`            |
+| `str.index_of`     | 2     | (Str, Str) → Num         | host `s.IndexOf(t)`, returns `-1` on miss                         |
+| `str.eq`           | 2     | (Str, Str) → Num         | `1` if `s₁ = s₂` char-wise, else `0`                              |
+| `str.upper`        | 1     | Str → Str                | host `s.ToUpperInvariant()`                                       |
+| `str.lower`        | 1     | Str → Str                | host `s.ToLowerInvariant()`                                       |
+| `str.starts_with`  | 2     | (Str, Str) → Num         | `1` if `s₁.StartsWith(s₂)`, else `0`                              |
+| `str.ends_with`    | 2     | (Str, Str) → Num         | `1` if `s₁.EndsWith(s₂)`, else `0`                                |
+
+Boolean-shaped results are returned as `0`/`1` to avoid a separate
+Bool-vs-Num promotion rule; truthification (§4.4) coerces them back.
+
+#### 5.1.2 `mathₛ` — numeric metafunctions
+
+| Operation       | Arity | Domain                | Semantics                                                    |
+|-----------------|-------|-----------------------|--------------------------------------------------------------|
+| `math.abs`      | 1     | Num → Num             | `|n|`                                                        |
+| `math.floor`    | 1     | Num → Num             | host `Math.Floor(n)` (IEEE-754)                              |
+| `math.ceil`     | 1     | Num → Num             | host `Math.Ceiling(n)`                                       |
+| `math.round`    | 1     | Num → Num             | host `Math.Round(n, MidpointRounding.ToEven)`                |
+| `math.min`      | 2     | (Num, Num) → Num      | `min(n₁, n₂)` (NaN-propagating, per `Math.Min`)              |
+| `math.max`      | 2     | (Num, Num) → Num      | `max(n₁, n₂)`                                                |
+| `math.sqrt`     | 1     | Num → Num             | `Math.Sqrt(n)`; `NaN` for `n < 0`                            |
+| `math.pow`      | 2     | (Num, Num) → Num      | `Math.Pow(b, e)`                                             |
+| `math.mod`      | 2     | (Num, Num) → Num      | C# `%` on doubles; NaN if divisor is 0                       |
+
+The `ops(v̄) = v` premise in [stdlib-op] is satisfied iff (a) the arity
+matches, (b) each `vᵢ` has the declared domain type, and (c) the host
+computation returns without throwing. If the host throws (e.g.,
+`str.to_num "abc"`), the term is stuck.
 
 ### 5.2 `arr.*` and `map.*`
 
@@ -435,13 +534,32 @@ Stated here for reference; proofs live in `docs/soundness.md`.
 Before this document is frozen (Week 2 exit):
 
 - [x] Every rule the checker needs has a number.
-- [ ] Every construct used in `WeatherFetcher.ag`, `Calculator.ag`,
+- [x] Every construct used in `WeatherFetcher.ag`, `Calculator.ag`,
       `ShoppingCart.ag`, `Pipeline.ag`, and `samples/caps/*.ag` has a
-      rule or is explicitly out of scope.
-- [ ] Independent reader (second pair of eyes) can trace one `(test …)`
-      by hand in ≤ 10 minutes.
+      rule or is explicitly out of scope (see §8.1).
+- [x] Independent reader (second pair of eyes) can trace one `(test …)`
+      by hand in ≤ 10 minutes (see Appendix A).
 - [ ] `ReferenceInterpreter.cs` stubs in `Agentic.Check/` compile with
-      `// E1-rule-N` tags matching the numbering here.
+      `// E1-rule-N` tags matching the numbering here. *(Week 4, C7
+      project setup.)*
+
+### 8.1 Construct coverage by sample
+
+| Sample                         | Constructs used in tests                                                   | Rules / scope                                         |
+|--------------------------------|----------------------------------------------------------------------------|-------------------------------------------------------|
+| `Calculator.ag`                | `defun`, `call`, `bin-op`, `return`, `assert-eq`                           | §4.6, §4.7, §4.3, §4.8, §4.15                         |
+| `ShoppingCart.ag`              | `defstruct`, `rec-new`, `rec-get`, `rec-set`, `call`, `bin-op`             | §4.9, §4.7, §4.3                                      |
+| `WeatherFetcher.ag`            | `http.fetch` (extern), `mocks`, `str.substring`, `str.index_of`, `json.*`  | §4.13, §4.14, §5.1.1, §5.2 (`json.*` derived)         |
+| `Pipeline.ag`                  | `arr.new`, `arr.set`, `arr.get`, `arr.length`                              | §4.10                                                 |
+| `Pipeline.ag` *(HOF tests)*    | `arr.map`, `arr.reduce`, first-class function refs                         | **Out of scope for E1** (§4.10, §6.4 — deferred to E2)|
+| `samples/caps/FileRead.ag`     | `file.read` (extern), `mocks`, `str.substring`, `str.index_of`             | §4.13, §4.14, §5.1.1                                  |
+| `samples/caps/FileWrite.ag`    | `file.write` (extern), `mocks`, `str.concat`, `str.from_num`               | §4.13, §4.14, §5.1.1                                  |
+| `samples/caps/EnvGet.ag`       | `env.get` (extern), `mocks`, `str.eq`, `if`                                | §4.13, §4.14, §5.1.1, §4.4                            |
+| `samples/caps/DbQuery.ag`      | `db.query` (extern), `mocks`, `str.to_num`                                 | §4.13, §4.14, §5.1.1                                  |
+| `samples/caps/ProcessSpawn.ag` | `process.spawn` (extern), `mocks`, `str.trim`, `str.concat`                | §4.13, §4.14, §5.1.1                                  |
+
+Any test whose body invokes an out-of-scope construct is filtered by
+C8 at manifest emission; the checker never sees those tests.
 
 ## 9. References
 
@@ -450,3 +568,95 @@ Before this document is frozen (Week 2 exit):
 - Standard small-step SOS presentation: Pierce, *Types and Programming
   Languages*, Ch. 3. Our judgment shape `e, σ ⟶ e', σ'` mirrors the
   imperative-fragment formulation there.
+
+## Appendix A — Worked example
+
+We trace Calculator's simplest test end-to-end. The goal is to show that
+a second reader can follow the reduction rules without intuition —
+every step cites a rule number from §4.
+
+### Source
+
+```
+(module Calculator
+  (defun add ((a : Num) (b : Num)) : Num
+    (return (+ a b)))
+
+  (test add
+    (assert-eq (add 1 2) 3)))
+```
+
+### Initial state
+
+After the parser has linked the module, the top-level reducer receives
+the expression `(do (defun add …) (test add …))` in store
+
+```
+σ₀ = ⟨Γ₀ = ∅, μ₀ = ∅, ρ₀ = ∅, φ₀ = ∅, τ₀ = ε⟩
+```
+
+(no bindings, no mocks, no records declared, no capabilities, empty
+test log).
+
+### Step-by-step
+
+1. **[ctx] + [defun].** The outer `do` evaluates its first subterm
+   `(defun add ((a : Num) (b : Num)) : Num (return (+ a b)))` at the
+   hole. [defun] registers the closure
+   `cl_add = ⟨Γ₀, (a, b), (return (+ a b))⟩` in the environment, yielding
+   store `σ₁ = σ₀[Γ.add := cl_add]` and reducing to `0`. [do-step] then
+   advances the sequence.
+
+2. **Enter test.** [ctx] drives reduction into `(test add …)`. The test
+   rule opens a `τ-scope` snapshotting `μ₁ = μ₀ = ∅` and setting
+   `current-test := add`. Store becomes
+   `σ₂ = σ₁[current-test := add]`.
+
+3. **[ctx] into the assertion.** Evaluation contexts reduce the inner
+   call `(add 1 2)` to its value first. The arguments `1` and `2` are
+   already values — rule [val] applies at each argument position.
+
+4. **[call] on `add`.** With `σ₂.Γ(add) = cl_add = ⟨Γ₀, (a, b),
+   (return (+ a b))⟩`, the rule pushes a new frame, yielding
+   `σ₃ = σ₂[Γ := Γ₀, a := 1, b := 2]` and the redex becomes
+   `(return (+ a b))`.
+
+5. **[ctx] + [var].** Inside `(+ a b)`, [var] resolves `a ↦ 1` and
+   `b ↦ 2`. The redex becomes `(+ 1 2)`.
+
+6. **[bin-op] for `+`.** `1 +ₛ 2 = 3`, so `(+ 1 2), σ₃ ⟶ 3, σ₃`.
+
+7. **[return].** `(return 3), σ₃ ⟶ 3, σ₄` where `σ₄` pops the frame —
+   `σ₄.Γ = σ₂.Γ` (the caller's environment is restored).
+
+8. **Back to the assertion.** The outer expression is now
+   `(assert-eq 3 3)`. [val] has already reduced both arguments.
+
+9. **[assert-eq-pass].** `3 = 3`, so `(assert-eq 3 3), σ₄ ⟶ 0, σ₄`.
+   The test log is unchanged (no failure).
+
+10. **[test-pass].** The test body `(assert-eq …)` has reduced to `0`
+    and no failures were attributed to `add` during its execution.
+    The rule appends `(add, pass)` to the log:
+    `σ₅ = σ₄[τ := (add, pass)]`.
+
+11. **[do-done].** The outer `do` has exhausted its subterms and
+    reduces to `0`.
+
+### Final state
+
+```
+σ₅ = ⟨Γ = {add ↦ cl_add}, μ = ∅, ρ = ∅, φ = ∅,
+      τ = (add, pass)⟩
+```
+
+The test log `τ` is exactly the output the checker emits for this
+manifest entry: `{"add": "pass"}`.
+
+**Rule coverage:** [ctx], [defun], [do-step], [do-done], [val], [var],
+[call], [bin-op], [return], [assert-eq-pass], [test-pass].
+
+**Reader time target:** a motivated reader should be able to verify
+this trace by cross-referencing §4 rule-by-rule in under 10 minutes.
+If it takes longer, the issue is almost certainly a rule whose form
+doesn't quite match the redex — file an issue against this document.

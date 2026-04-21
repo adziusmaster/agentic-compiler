@@ -186,6 +186,7 @@ public sealed class Compiler
 
         string csharp;
         bool isServer;
+        Runtime.ProofManifest? embeddedManifest = null;
         try
         {
             var transpiler = new Transpiler(_permissions, moduleLoader, null);
@@ -195,6 +196,7 @@ public sealed class Compiler
                 verifier.Capabilities.All.Where(c => verifier.DeclaredCapabilities.Contains(c.Name)).ToList(),
                 _permissions,
                 testsPassed);
+            embeddedManifest = transpiler.EmbeddedManifest;
             csharp = transpiler.Transpile(ast);
             isServer = transpiler.IsServerMode;
         }
@@ -247,6 +249,17 @@ public sealed class Compiler
         {
             var emitter = new NativeEmitter();
             string binaryPath = emitter.Emit(csharp, outputName, isServer);
+
+            // C6: bind the manifest to the emitted binary via SHA256. The
+            // sidecar `<binaryPath>.manifest.json` is the authoritative
+            // capability manifest post-C6; the embedded copy inside the
+            // binary is retained for `<bin> --verify` but does not include
+            // BinaryHash (a binary cannot contain its own hash in plaintext).
+            if (embeddedManifest is not null)
+            {
+                Runtime.ProofManifestBuilder.WriteSidecar(binaryPath, embeddedManifest);
+            }
+
             return new CompileResult
             {
                 Success = true,

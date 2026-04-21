@@ -110,29 +110,49 @@ static void RunVerify(string binaryPath)
     if (!File.Exists(binaryPath))
     {
         Console.WriteLine($"Error: binary '{binaryPath}' not found.");
+        Environment.ExitCode = 2;
         return;
     }
 
-    var psi = new System.Diagnostics.ProcessStartInfo
+    // C6: prefer the sidecar `<binaryPath>.manifest.json` over the embedded
+    // copy. The sidecar carries BinaryHash; the embedded copy does not
+    // (chicken-and-egg). If only the embedded copy is available, we run in
+    // "legacy" mode and skip the binary-hash check with a warning.
+    string sidecarPath = Agentic.Core.Runtime.ProofManifestBuilder.SidecarPathFor(binaryPath);
+    Agentic.Core.Runtime.ProofManifest manifest;
+    string source;
+    if (File.Exists(sidecarPath))
     {
-        FileName = binaryPath,
-        Arguments = "--verify",
-        RedirectStandardOutput = true,
-        UseShellExecute = false
-    };
-    using var process = System.Diagnostics.Process.Start(psi)!;
-    string manifestJson = process.StandardOutput.ReadToEnd();
-    process.WaitForExit();
+        manifest = Agentic.Core.Runtime.ProofManifest.FromJson(File.ReadAllText(sidecarPath));
+        source = "sidecar";
+    }
+    else
+    {
+        var psi = new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = binaryPath,
+            Arguments = "--verify",
+            RedirectStandardOutput = true,
+            UseShellExecute = false
+        };
+        using var process = System.Diagnostics.Process.Start(psi)!;
+        string manifestJson = process.StandardOutput.ReadToEnd();
+        process.WaitForExit();
 
-    if (string.IsNullOrWhiteSpace(manifestJson))
-    {
-        Console.WriteLine("Error: binary returned no manifest. Was it compiled with proof-carrying support?");
-        return;
+        if (string.IsNullOrWhiteSpace(manifestJson))
+        {
+            Console.WriteLine("Error: binary returned no manifest. Was it compiled with proof-carrying support?");
+            Environment.ExitCode = 2;
+            return;
+        }
+        manifest = Agentic.Core.Runtime.ProofManifest.FromJson(manifestJson);
+        source = "embedded";
     }
 
-    var manifest = Agentic.Core.Runtime.ProofManifest.FromJson(manifestJson);
-    Console.WriteLine($"Agentic binary manifest (schema {manifest.SchemaVersion})");
+    Console.WriteLine($"Agentic binary manifest (schema {manifest.SchemaVersion}, source: {source})");
     Console.WriteLine($"  Source hash  : {manifest.SourceHash[..16]}…");
+    if (!string.IsNullOrEmpty(manifest.BinaryHash))
+        Console.WriteLine($"  Binary hash  : {manifest.BinaryHash[..16]}…  (declared)");
     Console.WriteLine($"  Built at     : {manifest.BuiltAt:u}");
     Console.WriteLine($"  Capabilities : {(manifest.Capabilities.Count == 0 ? "(none)" : string.Join(", ", manifest.Capabilities))}");
     Console.WriteLine($"  Permissions  : {(manifest.Permissions.Count == 0 ? "(none — pure)" : string.Join(", ", manifest.Permissions))}");
@@ -142,8 +162,29 @@ static void RunVerify(string binaryPath)
     Console.WriteLine($"  Contracts    : {manifest.Contracts.Count}");
     foreach (var c in manifest.Contracts)
         Console.WriteLine($"    - {c.Function} ({c.Kind}): {c.SourceSnippet}");
+
+    if (string.IsNullOrEmpty(manifest.BinaryHash))
+    {
+        Console.WriteLine();
+        Console.WriteLine("Warning: manifest carries no BinaryHash (legacy or sidecar missing). Cannot detect post-emission tampering.");
+        Console.WriteLine("Verified: manifest extracted and structurally valid (unhashed).");
+        return;
+    }
+
+    string actualHash = Agentic.Core.Runtime.ProofManifestBuilder.HashBinary(binaryPath);
+    Console.WriteLine($"  Binary hash  : {actualHash[..16]}…  (actual)");
+    if (!string.Equals(actualHash, manifest.BinaryHash, StringComparison.OrdinalIgnoreCase))
+    {
+        Console.WriteLine();
+        Console.WriteLine("Error: binary-tampered — SHA256(binary) does not match manifest.BinaryHash.");
+        Console.WriteLine($"  declared : {manifest.BinaryHash}");
+        Console.WriteLine($"  actual   : {actualHash}");
+        Environment.ExitCode = 1;
+        return;
+    }
+
     Console.WriteLine();
-    Console.WriteLine("Verified: manifest extracted and structurally valid.");
+    Console.WriteLine("Verified: manifest extracted, structurally valid, and binary hash matches.");
 }
 
 static void RunInspect(string binaryPath)

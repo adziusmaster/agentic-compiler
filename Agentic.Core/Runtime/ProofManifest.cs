@@ -20,7 +20,8 @@ public sealed record ProofManifest(
     IReadOnlyList<string> Permissions,
     IReadOnlyList<EmbeddedTest> Tests,
     IReadOnlyList<EmbeddedContract> Contracts,
-    DateTime BuiltAt)
+    DateTime BuiltAt,
+    string BinaryHash = "")
 {
     public string ToJson() => JsonSerializer.Serialize(this, new JsonSerializerOptions
     {
@@ -123,5 +124,36 @@ public static class ProofManifestBuilder
     {
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(source));
         return Convert.ToHexString(bytes).ToLowerInvariant();
+    }
+
+    /// <summary>
+    /// SHA256 of the binary at <paramref name="binaryPath"/>, lowercase hex.
+    /// </summary>
+    public static string HashBinary(string binaryPath)
+    {
+        using var stream = File.OpenRead(binaryPath);
+        var bytes = SHA256.HashData(stream);
+        return Convert.ToHexString(bytes).ToLowerInvariant();
+    }
+
+    /// <summary>
+    /// Sidecar manifest path for a given binary: `<binaryPath>.manifest.json`.
+    /// The sidecar is the authoritative manifest post-C6. The embedded copy
+    /// inside the binary is kept for `<bin> --verify` convenience but does
+    /// not contain BinaryHash (chicken-and-egg).
+    /// </summary>
+    public static string SidecarPathFor(string binaryPath) =>
+        binaryPath + ".manifest.json";
+
+    /// <summary>
+    /// Writes <paramref name="manifest"/>, extended with `BinaryHash = SHA256(β)`,
+    /// to the sidecar path for the given binary. Returns the sidecar path.
+    /// </summary>
+    public static string WriteSidecar(string binaryPath, ProofManifest manifest)
+    {
+        var withHash = manifest with { BinaryHash = HashBinary(binaryPath) };
+        var sidecarPath = SidecarPathFor(binaryPath);
+        File.WriteAllText(sidecarPath, withHash.ToJson());
+        return sidecarPath;
     }
 }

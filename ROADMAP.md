@@ -400,6 +400,14 @@ machine B with no access to the source.
 **Objective.** Write down — precisely — what `agc-check` guarantees. Without
 this, Arc C is a collection of engineering conveniences, not a theorem.
 
+**Status (2026-04-21):** frozen. Live at
+[`docs/safety-policy.md`](docs/safety-policy.md). Defines the checker's
+subject `Π = (β, σ, μ)`, six well-formedness preconditions WF1–WF6, the
+three guarantees CS (capability soundness) / TC (test conformance) /
+CV (contract validity) as predicates on `Π`, seven enumerated non-goals
+NG-1–NG-7, and two named trust assumptions TA-1 (capability-extractor
+soundness) / TA-2 (emitter implements E1).
+
 **Deliverables.**
 
 - `docs/safety-policy.md` — a specification of the three guarantees the
@@ -428,6 +436,17 @@ can't provide).
 
 **Objective.** Detect post-emission tampering: if anyone edits the binary
 after compilation, `agc verify` / `agc-check` must reject it.
+
+**Status (2026-04-21):** shipped. `ProofManifest` gained a `BinaryHash`
+field; `Compiler.Compile` writes a sidecar `<binaryPath>.manifest.json`
+holding the full manifest including `BinaryHash = SHA256(β)` (the
+embedded copy inside the binary omits this field due to the chicken-
+and-egg: a binary cannot contain its own hash in plaintext). `agc verify`
+prefers the sidecar, recomputes SHA256 on disk, exits 1 with
+`binary-tampered` if mismatched. End-to-end smoke test on
+`samples/Calculator.ag`: untampered → exit 0; flipping one byte in the
+emitted binary → exit 1 with both declared and actual hashes printed.
+9 unit tests in `BinaryHashTests`. 343/343 suite green.
 
 **Deliverables.**
 
@@ -565,6 +584,11 @@ for the submission draft; Coq / Lean is a follow-up.
 
 **Objective.** A reference semantics for the subset used by `agc-check`.
 Clear, inspectable, one document.
+
+**Status (2026-04-20):** drafted and frozen pending `ReferenceInterpreter.cs`
+stubs. Live at [`docs/semantics.md`](docs/semantics.md) — see §4 for the
+reduction relation, §5.1 for `str.*` / `math.*` metafunction tables, §8.1
+for construct coverage by sample, and Appendix A for a worked test trace.
 
 **Deliverables.**
 

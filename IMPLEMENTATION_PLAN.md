@@ -309,22 +309,36 @@ any assumptions rewritten.
 
 **Shipped (formalism / Track F).**
 
-- **E1 draft.** `docs/semantics.md` written (≈ 12 pages). Small-step
-  SOS rules for the subset: literals, arithmetic / comparisons, `if`,
-  `while`, `do`, `def` / `set`, first-order `defun` / `return`, record
-  creation / field access / `set-*`, capability calls under mocks,
-  mock frame semantics, assertions, tests, contracts. Evaluation
-  contexts factored out. Trust-assumptions and out-of-scope items
-  (HOF, modules, `try/catch`, `[cap-real]` in checker) explicitly
-  enumerated. Review checklist (§8) left partially unchecked — needs
-  walk-through of existing samples to confirm full coverage before the
-  Week 2 freeze.
+- **E1 draft + freeze.** `docs/semantics.md` written and frozen
+  (≈ 14 pages). Small-step SOS rules for the subset: literals,
+  arithmetic / comparisons, `if`, `while`, `do`, `def` / `set`,
+  first-order `defun` / `return`, records (new / get / set-*), arrays
+  (new / get / set / length), maps (new / get / set / has), capability
+  calls under mocks, mock frame semantics, assertions, tests,
+  contracts. Evaluation contexts factored out. Rules numbered
+  §4.1 – §4.17 as the contract for `ReferenceInterpreter.cs`
+  `// E1-rule-N` tags. §5.1 added concrete `strₛ` / `mathₛ`
+  metafunction tables (12 `str.*` ops, 9 `math.*` ops). §8.1 added
+  a construct-coverage table cross-indexing every construct used by
+  tests in Calculator, ShoppingCart, WeatherFetcher, Pipeline, and
+  `samples/caps/*.ag` against rule numbers. Appendix A added a worked
+  trace of Calculator's `(test add (assert-eq (add 1 2) 3))` through
+  11 reduction steps, citing every rule used ([ctx], [defun], [do-*],
+  [val], [var], [call], [bin-op], [return], [assert-eq-pass],
+  [test-pass]). Out-of-scope items explicitly enumerated: HOF,
+  modules, `try/catch`, `[cap-real]` in checker, `arr.map` /
+  `arr.filter` / `arr.reduce` (HOF-adjacent — deferred to E2). Review
+  checklist §8: three of four boxes ticked; the remaining box
+  (`ReferenceInterpreter.cs` stubs compile) is a Week 4 C7-setup
+  deliverable, intentionally deferred. `ROADMAP.md` Arc E1 section
+  cross-references the doc.
 
 **Slipped.** None. Week 1 delivered exit for A5 (fully), A4 (fully —
-originally scheduled to spill into Week 2), and the E1 draft.
+originally scheduled to spill into Week 2), and E1 draft + freeze
+(originally Week 2 freeze).
 
 **LOC budget status.** `Agentic.Check/` not yet created (Week 4).
-Documentation: `docs/semantics.md` ≈ 12 pages (budget 20). Healthy.
+Documentation: `docs/semantics.md` ≈ 14 pages (budget 20). Healthy.
 
 **Assumptions rewritten.** None. No roadmap sections invalidated.
 
@@ -344,6 +358,52 @@ Documentation: `docs/semantics.md` ≈ 12 pages (budget 20). Healthy.
   complicated debugging. Kept as-is; documented here so future
   debugging sessions clear `.agc-cache` first.
 
-**Next week.** A4 is done; Week 2 is now E1 freeze + start C5 (formal
-safety policy). E2 draft can begin in parallel.
+**Next week.** A4 and E1 are done; Week 2 is now start C5 (formal
+safety policy for `agc-check`) + start E2 draft (type-and-capability
+effect system). C6 (binary-hash binding) can slot in as a single-day
+task whenever. Week 4's `Agentic.Check/` scaffold will pick up the
+fourth E1 checklist box (`ReferenceInterpreter.cs` stubs with
+`// E1-rule-N` tags).
+
+## Week 2 actuals (2026-04-21, in progress)
+
+**Shipped.**
+
+- **C6 — binary-hash binding.** `ProofManifest` gained `BinaryHash`
+  field (defaults to `""` for back-compat / legacy manifests).
+  `ProofManifestBuilder` gained `HashBinary(path)`, `SidecarPathFor(path)`,
+  and `WriteSidecar(path, manifest)` helpers. `Compiler.Compile` writes
+  `<binaryPath>.manifest.json` sidecar after `NativeEmitter.Emit`
+  returns. The embedded copy inside the binary intentionally omits
+  `BinaryHash` (a binary cannot plaintext-contain its own hash).
+  `agc verify <bin>` prefers the sidecar: reads it, recomputes
+  SHA256 of the binary on disk, exits 1 with `binary-tampered`
+  diagnostic (printing both declared and actual hashes) on mismatch.
+  Falls back to embedded-manifest mode with a "cannot detect
+  post-emission tampering" warning when no sidecar is present.
+  **End-to-end smoke test** on `samples/Calculator.ag`: compile →
+  verify → exit 0 ("binary hash matches"); then flip one byte at
+  offset 1024 → verify → exit 1 (`binary-tampered`). **9 unit tests**
+  in `Agentic.Core.Tests/Runtime/BinaryHashTests.cs` (hash stability,
+  tamper detection, sidecar round-trip, legacy-JSON deserialization,
+  immutability of the input manifest record). Suite: 343/343 passing
+  (was 334).
+
+- **C5 — formal safety policy.** `docs/safety-policy.md` written and
+  frozen (one page — ~5 KB). Defines the checker's subject
+  `Π = (β, σ, μ)`; six well-formedness preconditions WF1–WF6 (schema
+  version, source hash, binary hash, capability-permission matching,
+  E1 parseability, E1-subset conformance); three guarantees as
+  predicates on `Π` — CS (capability soundness, syscalls ⊆ manifest),
+  TC (test conformance via ⟶*_E1 to test-log pass), CV (contract
+  validity as TC applied to contract-as-test); seven non-goals NG-1
+  through NG-7 (termination, non-test equivalence, memory safety as
+  emitter-provided, side channels, resource bounds, concurrency,
+  supply chain); two named trust assumptions TA-1 (CapabilityExtractor
+  soundness) and TA-2 (emitter implements E1 — the emitter-semantics
+  gap). Terminology cleanup: "proof-carrying" reserved for the
+  CS+TC+CV bundle; manifest itself is a "capability manifest". Cross-
+  references to `docs/semantics.md`, `docs/effects.md` (E2),
+  `docs/soundness.md` (E3), `docs/tcb.md` (C9). ROADMAP.md Arc C5
+  section updated with status + link.
 
