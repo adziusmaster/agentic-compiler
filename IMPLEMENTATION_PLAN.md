@@ -439,3 +439,36 @@ fourth E1 checklist box (`ReferenceInterpreter.cs` stubs with
   with `--source`: `accept`, 2/2 tests pass, binary + source hashes
   match, capabilities empty. Both projects added to `AgenticLanguage.sln`.
 
+- **C8 — VC emission for tests.** `ProofManifest` gained a new
+  `EmbeddedDef(Kind, Name, SourceSnippet)` list. `ProofManifestBuilder`
+  unwraps the `(module …)` head and walks top-level forms, emitting one
+  `EmbeddedDef` per `defun` / `defstruct` / `extern` / `def`. Snippet
+  truncation (previously 200 chars for tests, 120 for contracts)
+  **removed** — the JSON manifest now carries full, parser-faithful
+  S-expressions for every test, contract, and def. `Agentic.Check/
+  Manifest.cs` mirrors the field. `Checker.RunTC`, when called without
+  `--source` and with a non-empty `Defs`, spins a single shared
+  `ReferenceInterpreter`, pre-evaluates each embedded def, then runs
+  each test snippet against that shared state — no `--source` required.
+  **Bug fix in the checker's reference interpreter**: `EvalDefun`
+  previously treated only the last list element as the body, silently
+  dropping `require` / `ensure` contracts that appear before `return`.
+  It now scans past the optional `: <ReturnType>` annotation and wraps
+  any remaining multi-form body in a synthetic `(do …)`. Three new
+  tests in `Agentic.Check.Tests/CheckerTests.cs`:
+  `Run_NoSource_WithEmbeddedDefs_AcceptsTestsThatCallUserFunctions` (core
+  C8 win), `Run_NoSource_WithContractsInEmbeddedDefs_EnforcesRequireAtCallSite`
+  (contract-as-VC happy path), `Run_NoSource_ContractViolation_RejectsAsTestFail`
+  (contract-as-VC negative). **End-to-end smoke** on
+  `samples/Calculator.ag`: compile → sidecar shows two `Defs` entries
+  with full defun bodies → `agc-check <bin>` (no `--source`) →
+  `accept`, 2/2 tests pass. Full solution suite: **343 Core + 11 Check
+  = 354/354 passing**. Checker TCB LOC: **1153** (Checker.cs 182→203,
+  ReferenceInterpreter.cs 579→597 for the defun-body fix; everything
+  else unchanged). Well under the 1500 budget. Follow-ups explicitly
+  deferred: structured capability-mock map per test (currently mocks
+  remain as S-expr inside the test body — untouched until a sample
+  actually exercises it); JSON-native AST per VC (text snippets parsed
+  by the same grammar already satisfy "checker parses this, not
+  arbitrary `.ag`" — the distinction doesn't buy safety).
+

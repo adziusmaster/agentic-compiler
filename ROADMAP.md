@@ -558,6 +558,27 @@ the source beyond what the manifest embeds.
 `--source` is a second line of defense, not a prerequisite. Running
 `agc-check <bin>` (no `--source`) still validates tests and contracts.
 
+**Status (2026-04-21): shipped.** `ProofManifest` gained an `EmbeddedDef`
+list (`Kind`, `Name`, full untruncated `SourceSnippet`), populated by
+`ProofManifestBuilder.Build` from the top-level `defun` / `defstruct` /
+`extern` / `def` forms under `(module …)`. Snippet truncation removed —
+JSON round-trip now works. Checker reads `Defs` from sidecar and, when
+no `--source` is given, pre-evaluates them into a shared reference
+interpreter, then runs each test snippet against that interpreter.
+`EvalDefun` fixed to synthesise a `(do …)` wrapper when the body has
+multiple forms (previously only the last form was evaluated, silently
+skipping `require` / `ensure`). Three new Check tests:
+`Run_NoSource_WithEmbeddedDefs_AcceptsTestsThatCallUserFunctions`,
+`Run_NoSource_WithContractsInEmbeddedDefs_EnforcesRequireAtCallSite`,
+`Run_NoSource_ContractViolation_RejectsAsTestFail`. End-to-end smoke:
+compile `samples/Calculator.ag` → sidecar contains both `Defs` entries
+→ `agc-check <bin>` (no `--source`) → `accept`, 2/2 tests pass. Suite
+**354/354** (343 Core + 11 Check). Checker TCB 1153 LOC (still under
+1500 budget). Follow-ups deferred: structured capability-mock map
+(currently mocks stay as S-expr inside test body); JSON-native AST
+per-VC (text snippets through the same parser already satisfy the
+self-contained-VC acceptance).
+
 **Paper hook.** This is where "verification-condition" earns the name.
 
 ### C9 — TCB audit document

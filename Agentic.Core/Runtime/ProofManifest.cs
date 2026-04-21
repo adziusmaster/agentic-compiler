@@ -21,7 +21,8 @@ public sealed record ProofManifest(
     IReadOnlyList<EmbeddedTest> Tests,
     IReadOnlyList<EmbeddedContract> Contracts,
     DateTime BuiltAt,
-    string BinaryHash = "")
+    string BinaryHash = "",
+    IReadOnlyList<EmbeddedDef>? Defs = null)
 {
     public string ToJson() => JsonSerializer.Serialize(this, new JsonSerializerOptions
     {
@@ -38,12 +39,25 @@ public sealed record EmbeddedTest(string Name, string SourceSnippet, int Expecte
 public sealed record EmbeddedContract(string Function, string Kind, string SourceSnippet);
 
 /// <summary>
+/// A top-level definition form (defun/defstruct/extern/def) emitted into the
+/// manifest so the checker can evaluate tests without re-reading the source.
+/// The checker parses <see cref="SourceSnippet"/> as an S-expression and feeds
+/// it to its reference interpreter.
+/// </summary>
+public sealed record EmbeddedDef(string Kind, string Name, string SourceSnippet);
+
+/// <summary>
 /// Extracts the structured manifest from an AST + compile context.
 /// Consumed by the Transpiler (embeds as resource) and by `agc verify`
 /// (reads back for independent audit).
 /// </summary>
 public static class ProofManifestBuilder
 {
+    // Top-level definition head symbols that the checker can pre-evaluate
+    // without a source file. Kept in sync with Agentic.Check/Checker.RunTC.
+    private static readonly HashSet<string> DefKinds =
+        new() { "defun", "defstruct", "extern", "def" };
+
     public static ProofManifest Build(
         AstNode ast,
         string source,
@@ -53,6 +67,29 @@ public static class ProofManifestBuilder
     {
         var tests = new List<EmbeddedTest>();
         var contracts = new List<EmbeddedContract>();
+        var defs = new List<EmbeddedDef>();
+
+        // Top-level forms live under (module Name <forms…>) — unwrap if present.
+        IEnumerable<AstNode> topLevel = ast is ListNode top
+            && top.Elements.Count > 0
+            && top.Elements[0] is AtomNode headAtom
+            && headAtom.Token.Value == "module"
+            ? top.Elements.Skip(2)
+            : (ast is ListNode program ? program.Elements : Enumerable.Empty<AstNode>());
+
+        foreach (var form in topLevel)
+        {
+            if (form is not ListNode list || list.Elements.Count == 0) continue;
+            if (list.Elements[0] is not AtomNode head) continue;
+            var op = head.Token.Value;
+            if (!DefKinds.Contains(op)) continue;
+            string defName =
+                list.Elements.Count >= 2 && list.Elements[1] is AtomNode n1 ? n1.Token.Value :
+                list.Elements.Count >= 3 && list.Elements[2] is AtomNode n2 ? n2.Token.Value :
+                "<anon>";
+            defs.Add(new EmbeddedDef(op, defName, AstToSexpr(form)));
+        }
+
         Walk(ast, tests, contracts, currentFn: null);
 
         return new ProofManifest(
@@ -62,7 +99,8 @@ public static class ProofManifestBuilder
             Permissions: permissions.GrantedKeys().OrderBy(x => x).ToList(),
             Tests: tests.Select(t => t with { ExpectedPasses = testsPassed }).ToList(),
             Contracts: contracts,
-            BuiltAt: DateTime.UtcNow);
+            BuiltAt: DateTime.UtcNow,
+            Defs: defs);
     }
 
     private static void Walk(AstNode node, List<EmbeddedTest> tests, List<EmbeddedContract> contracts, string? currentFn)
@@ -74,7 +112,7 @@ public static class ProofManifestBuilder
         {
             tests.Add(new EmbeddedTest(
                 Name: nameAtom.Token.Value,
-                SourceSnippet: AstToSexpr(list, maxLen: 200),
+                SourceSnippet: AstToSexpr(list),
                 ExpectedPasses: 0));
         }
 
@@ -86,18 +124,19 @@ public static class ProofManifestBuilder
             contracts.Add(new EmbeddedContract(
                 Function: currentFn,
                 Kind: op,
-                SourceSnippet: AstToSexpr(list, maxLen: 120)));
+                SourceSnippet: AstToSexpr(list)));
         }
 
         foreach (var child in list.Elements) Walk(child, tests, contracts, currentFn);
     }
 
-    private static string AstToSexpr(AstNode node, int maxLen)
+    // Snippets are no longer truncated (C8): the checker must be able to re-parse
+    // them as S-expressions. A manifest is JSON on disk; size is not constrained.
+    private static string AstToSexpr(AstNode node)
     {
         var sb = new StringBuilder();
         Emit(node, sb);
-        var s = sb.ToString();
-        return s.Length > maxLen ? s[..maxLen] + "…" : s;
+        return sb.ToString();
     }
 
     private static void Emit(AstNode node, StringBuilder sb)

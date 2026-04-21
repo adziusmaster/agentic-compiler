@@ -18,7 +18,8 @@ public sealed record CheckManifest(
     [property: JsonPropertyName("Tests")] List<CheckTest> Tests,
     [property: JsonPropertyName("Contracts")] List<CheckContract> Contracts,
     [property: JsonPropertyName("BuiltAt")] DateTime BuiltAt,
-    [property: JsonPropertyName("BinaryHash")] string BinaryHash = "");
+    [property: JsonPropertyName("BinaryHash")] string BinaryHash = "",
+    [property: JsonPropertyName("Defs")] List<CheckDef>? Defs = null);
 
 public sealed record CheckTest(
     [property: JsonPropertyName("Name")] string Name,
@@ -28,6 +29,14 @@ public sealed record CheckTest(
 public sealed record CheckContract(
     [property: JsonPropertyName("Function")] string Function,
     [property: JsonPropertyName("Kind")] string Kind,
+    [property: JsonPropertyName("SourceSnippet")] string SourceSnippet);
+
+// C8: top-level definition embedded in the manifest so the checker can
+// re-run tests without loading the original .ag file. The SourceSnippet
+// is the full untruncated S-expression of the form.
+public sealed record CheckDef(
+    [property: JsonPropertyName("Kind")] string Kind,
+    [property: JsonPropertyName("Name")] string Name,
     [property: JsonPropertyName("SourceSnippet")] string SourceSnippet);
 
 public static class ManifestLoader

@@ -37,7 +37,9 @@ public sealed class CheckerTests : IDisposable
         byte[] binaryBytes,
         string sourceText,
         List<string> capabilities,
-        List<CheckTest> tests)
+        List<CheckTest> tests,
+        List<CheckDef>? defs = null,
+        List<CheckContract>? contracts = null)
     {
         string binPath = Path.Combine(_tmpDir, "prog");
         string srcPath = Path.Combine(_tmpDir, "prog.ag");
@@ -54,9 +56,10 @@ public sealed class CheckerTests : IDisposable
             Capabilities: capabilities,
             Permissions: new List<string>(),
             Tests: tests,
-            Contracts: new List<CheckContract>(),
+            Contracts: contracts ?? new List<CheckContract>(),
             BuiltAt: DateTime.UtcNow,
-            BinaryHash: binHash);
+            BinaryHash: binHash,
+            Defs: defs);
 
         File.WriteAllText(ManifestLoader.SidecarPath(binPath),
             JsonSerializer.Serialize(manifest));
@@ -201,6 +204,111 @@ public sealed class CheckerTests : IDisposable
         // Assert
         result.Verdict.Should().Be(Verdict.Reject);
         result.Code.Should().Be("io-error");
+    }
+
+    // ─── C8: VC emission — checker accepts from (binary, manifest) alone ───
+
+    [Fact]
+    public void Run_NoSource_WithEmbeddedDefs_AcceptsTestsThatCallUserFunctions()
+    {
+        // Arrange — manifest embeds the `add` defun; the test snippet calls it.
+        // Without C8 this would fail "Unbound variable: add" because the
+        // test snippet alone has no way to resolve the reference.
+        var defs = new List<CheckDef>
+        {
+            new("defun", "add",
+                "(defun add ((a : Num) (b : Num)) : Num (return (+ a b)))"),
+        };
+        var tests = new List<CheckTest>
+        {
+            new("add", "(test add (assert-eq (add 1 2) 3))", ExpectedPasses: 1),
+        };
+        var (binPath, _, _) = BuildFixture(
+            binaryBytes: Encoding.UTF8.GetBytes("inert"),
+            sourceText: "(module M)",
+            capabilities: new List<string>(),
+            tests: tests,
+            defs: defs);
+
+        // Act — no sourcePath passed.
+        var result = Checker.Run(binPath);
+
+        // Assert — manifest alone is sufficient; no source path was passed.
+        result.Verdict.Should().Be(Verdict.Accept);
+        result.TestsPassed.Should().Be(1);
+    }
+
+    [Fact]
+    public void Run_NoSource_WithContractsInEmbeddedDefs_EnforcesRequireAtCallSite()
+    {
+        // Arrange — defun with a (require …). The test calls it with a
+        // satisfying argument so the contract passes. This exercises the
+        // multi-form defun body path (require + return) which needs the
+        // implicit-do synthesis in EvalDefun.
+        var defs = new List<CheckDef>
+        {
+            new("defun", "add_nonneg",
+                "(defun add_nonneg ((a : Num) (b : Num)) : Num " +
+                "(require (>= a 0)) (require (>= b 0)) (return (+ a b)))"),
+        };
+        var contracts = new List<CheckContract>
+        {
+            new("add_nonneg", "require", "(require (>= a 0))"),
+            new("add_nonneg", "require", "(require (>= b 0))"),
+        };
+        var tests = new List<CheckTest>
+        {
+            new("add_nonneg_ok",
+                "(test add_nonneg_ok (assert-eq (add_nonneg 5 3) 8))",
+                ExpectedPasses: 1),
+        };
+        var (binPath, _, _) = BuildFixture(
+            binaryBytes: Encoding.UTF8.GetBytes("inert"),
+            sourceText: "(module M)",
+            capabilities: new List<string>(),
+            tests: tests,
+            defs: defs,
+            contracts: contracts);
+
+        // Act
+        var result = Checker.Run(binPath);
+
+        // Assert
+        result.Verdict.Should().Be(Verdict.Accept);
+        result.TestsPassed.Should().Be(1);
+    }
+
+    [Fact]
+    public void Run_NoSource_ContractViolation_RejectsAsTestFail()
+    {
+        // Arrange — same defun, but test passes a negative argument that
+        // violates the (require (>= a 0)) precondition. Expected: the
+        // contract aborts, test status = fail, verdict = reject.
+        var defs = new List<CheckDef>
+        {
+            new("defun", "square",
+                "(defun square ((n : Num)) : Num " +
+                "(require (>= n 0)) (return (* n n)))"),
+        };
+        var tests = new List<CheckTest>
+        {
+            new("square_neg",
+                "(test square_neg (assert-eq (square -2) 4))",
+                ExpectedPasses: 1),
+        };
+        var (binPath, _, _) = BuildFixture(
+            binaryBytes: Encoding.UTF8.GetBytes("inert"),
+            sourceText: "(module M)",
+            capabilities: new List<string>(),
+            tests: tests,
+            defs: defs);
+
+        // Act
+        var result = Checker.Run(binPath);
+
+        // Assert
+        result.Verdict.Should().Be(Verdict.Reject);
+        result.Code.Should().Be("test-fail");
     }
 
     [Fact]

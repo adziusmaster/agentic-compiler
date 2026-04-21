@@ -264,8 +264,26 @@ public sealed class ReferenceInterpreter
             else if (p is SList ps && ps.Elements.Count > 0 && ps.Elements[0] is Atom pn)
                 paramNames.Add(pn.Value);
         }
-        // Skip over optional `:` and return type — the body is the last form.
-        Node body = list.Elements[^1];
+        // Skip optional `: <ReturnType>` annotation; remaining forms are the body.
+        int bodyStart = 3;
+        if (bodyStart < list.Elements.Count
+            && list.Elements[bodyStart] is Atom colon && colon.Value == ":")
+            bodyStart += 2;
+
+        Node body;
+        int bodyCount = list.Elements.Count - bodyStart;
+        if (bodyCount <= 0)
+            body = new Atom("0", AtomKind.Number); // empty body → returns 0
+        else if (bodyCount == 1)
+            body = list.Elements[bodyStart];
+        else
+        {
+            // Multi-form body (e.g. require/ensure preceding return) → synthetic (do …).
+            var doForms = new List<Node> { new Atom("do", AtomKind.Symbol) };
+            for (int i = bodyStart; i < list.Elements.Count; i++)
+                doForms.Add(list.Elements[i]);
+            body = new SList(doForms);
+        }
         // E1-rule §4.7 [defun]: register closure in the frame.
         env.Set(name, new Value.Closure(paramNames, body, env));
         return new Value.Unit();

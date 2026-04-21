@@ -110,23 +110,44 @@ public sealed class Checker
         int passed = 0;
         if (sourcePath is null)
         {
+            // C8: if the manifest embeds Defs, pre-evaluate them into a shared
+            // interpreter so test snippets that reference user-defined
+            // functions (the common case) resolve without --source.
+            var interpVc = new ReferenceInterpreter(manifest.Capabilities);
+            if (manifest.Defs is { Count: > 0 } embeddedDefs)
+            {
+                foreach (var d in embeddedDefs)
+                {
+                    Node defNode;
+                    try { defNode = Parser.Parse(d.SourceSnippet); }
+                    catch (ParseException pe)
+                    { return (Verdict.Reject, "well-formedness",
+                        $"WF5: embedded def '{d.Name}' ({d.Kind}) parse: {pe.Message}", passed); }
+                    try { interpVc.Run(new[] { defNode }); }
+                    catch (Exception ex)
+                    { return (Verdict.Reject, "source-eval-error",
+                        $"embedded def '{d.Name}' ({d.Kind}): {ex.Message}", passed); }
+                }
+            }
+
             foreach (var t in manifest.Tests)
             {
-                var interp = new ReferenceInterpreter(manifest.Capabilities);
-                try
-                {
-                    var node = Parser.Parse(t.SourceSnippet);
-                    interp.RunTest(node);
-                }
+                Node testNode;
+                try { testNode = Parser.Parse(t.SourceSnippet); }
+                catch (ParseException pe)
+                { return (Verdict.Reject, "well-formedness",
+                    $"WF5: test '{t.Name}' parse: {pe.Message}", passed); }
+                try { interpVc.RunTest(testNode); }
                 catch (Exception ex)
                 { return (Verdict.Reject, "test-fail",
                     $"TC: test '{t.Name}' threw {ex.GetType().Name}: {ex.Message}", passed); }
-                var entry = interp.Log.Entries.FirstOrDefault();
+                var entry = interpVc.Log.Entries[^1];
                 if (entry.Status == "pass") passed++;
                 else return (Verdict.Reject, "test-fail",
                     $"TC: test '{t.Name}' failed: {entry.Reason ?? "(no reason)"}", passed);
             }
-            return (Verdict.Accept, "accept", "tc ok (snippet-only)", passed);
+            string msg = manifest.Defs is { Count: > 0 } ? "tc ok (manifest-only VCs)" : "tc ok (snippet-only)";
+            return (Verdict.Accept, "accept", msg, passed);
         }
 
         // With --source: pre-evaluate definitions, then run each test form.
