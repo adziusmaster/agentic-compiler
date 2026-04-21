@@ -407,3 +407,35 @@ fourth E1 checklist box (`ReferenceInterpreter.cs` stubs with
   `docs/soundness.md` (E3), `docs/tcb.md` (C9). ROADMAP.md Arc C5
   section updated with status + link.
 
+- **C7 — independent checker `agc-check`.** The single longest-pole item
+  on the critical path. New project `Agentic.Check/` built as a BCL-only
+  console app (`AssemblyName=agc-check`, no ProjectReference to
+  `Agentic.Core`). Files: `Parser.cs` (146 LOC, mini S-expr with
+  comments + escape handling), `Manifest.cs` (63 LOC, JSON records
+  deliberately duplicated from Core with matching `[JsonPropertyName]`),
+  `ReferenceInterpreter.cs` (579 LOC — every reduction path tagged
+  `// E1-rule §4.N` from `docs/semantics.md`; covers all E1 literals,
+  variables, defun/defstruct/extern, if/let/lambda, arr/map ops, str.*,
+  math.*, assert-eq/assert-true/assert-near, require/ensure, and
+  capability calls resolved through manifest-embedded mocks with
+  exact-then-wildcard lookup), `CapabilityExtractor.cs` (63 LOC,
+  substring-scan of binary for seven capability emit-signatures),
+  `Checker.cs` (182 LOC, testable entry-point — `Verdict` enum,
+  `CheckResult` record, `Checker.Run(binaryPath, sourcePath, policy)`
+  returns structured result), `Program.cs` (72 LOC — argv parsing and
+  exit-code translation only, delegates to `Checker.Run`). **Total:
+  1105 LOC**, well under the 1500 TCB budget. CLI: `--source <file>`
+  (optional, parses full program, pre-evaluates definition forms
+  — defun/defstruct/extern/def — and skips import/module/sys.* main-
+  effect calls; then looks up tests by name), `--policy safety|strict`
+  (strict adds observed⊊declared → reject). Exit codes 0/1/2. All five
+  required rejection scenarios implemented and tested in
+  `Agentic.Check.Tests/CheckerTests.cs`: `binary-tampered`,
+  `source-mismatch`, `capability-undeclared`, `test-count-mismatch`,
+  plus `io-error` / `no-manifest`. Happy-path test covers both the
+  zero-tests case and a self-contained `(test t (assert-eq 1 1))`
+  snippet. **8 tests, all green.** Full solution suite: 343 Core + 8
+  Check = **351/351 passing**. End-to-end smoke on `samples/Calculator`
+  with `--source`: `accept`, 2/2 tests pass, binary + source hashes
+  match, capabilities empty. Both projects added to `AgenticLanguage.sln`.
+

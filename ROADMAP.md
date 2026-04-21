@@ -516,6 +516,20 @@ dependency on `Agentic.Core`'s transpiler, and be small enough to audit.
 **Acceptance.** Checker LOC ≤ 1500, runtime dependencies ≤ BCL only,
 every negative test above rejects with a distinct diagnostic code.
 
+**Status (2026-04-21): shipped.** `Agentic.Check/` delivered as a
+standalone BCL-only console app with `AssemblyName=agc-check`:
+`Parser.cs` (146 LOC), `Manifest.cs` (63 LOC), `ReferenceInterpreter.cs`
+(579 LOC — every reduction path tagged `// E1-rule §4.N`),
+`CapabilityExtractor.cs` (63 LOC), `Checker.cs` (182 LOC, testable
+entry-point), `Program.cs` (72 LOC, argv + exit-code translation only).
+Total **1105 LOC**, well under the 1500 budget. No ProjectReference to
+`Agentic.Core`. Tests in `Agentic.Check.Tests/` cover the five required
+rejection codes (`binary-tampered`, `source-mismatch`,
+`capability-undeclared`, `test-count-mismatch`, plus `io-error` /
+`no-manifest`) and happy-path accept — 8 tests, all green alongside the
+existing 343 Core tests. End-to-end smoke against `samples/Calculator`
+with `--source`: `accept`, 2/2 tests pass.
+
 **Paper hook.** This *is* the independent-checker claim. Section 4 of the
 paper.
 
