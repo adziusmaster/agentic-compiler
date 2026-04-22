@@ -601,6 +601,18 @@ writing.
     cannot achieve against the checker.
 - CI check: fail the build if `Agentic.Check/` LOC exceeds the budget.
 
+**Status (2026-04-21): shipped.** `docs/tcb.md` written and frozen.
+Structure: what's in the TCB (per-file LOC table totalling 1153, BCL-only
+dependency inventory, enumerated I/O), the two named axioms TA-1/TA-2
+linked from `safety-policy.md`, an adversary-controls attack-surface
+table, an explicit "what is *not* in the TCB" list, and a six-step
+re-audit checklist targeted at 30 minutes. CI gate: new MSBuild target
+`CheckTcbLocBudget` in `Agentic.Check.csproj` fails the build with
+`TCB_LOC_BUDGET_EXCEEDED` if `Agentic.Check/*.cs` line count exceeds
+1500 (current: 1020 MSBuild-counted, 1153 `wc -l`). Verified by
+temporarily lowering the budget — gate fires with the expected error
+code, then reverted.
+
 **Acceptance.** A reviewer can, in 30 minutes, read the TCB doc and
 understand exactly what to trust. The document is one file, not a tour
 of the codebase.

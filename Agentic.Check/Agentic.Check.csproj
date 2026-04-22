@@ -8,6 +8,26 @@
     <AssemblyName>agc-check</AssemblyName>
     <RootNamespace>Agentic.Check</RootNamespace>
     <!-- TCB: BCL only. No ProjectReference to Agentic.Core. No third-party NuGet. -->
+    <TcbLocBudget>1500</TcbLocBudget>
   </PropertyGroup>
+
+  <!-- C9: enforce the TCB line-count budget at build time. Counts non-blank
+       lines across all *.cs in this project. See docs/tcb.md §5. -->
+  <Target Name="CheckTcbLocBudget" BeforeTargets="CoreCompile">
+    <ItemGroup>
+      <TcbSource Include="*.cs" />
+    </ItemGroup>
+    <ReadLinesFromFile File="%(TcbSource.FullPath)">
+      <Output TaskParameter="Lines" ItemName="TcbLines" />
+    </ReadLinesFromFile>
+    <PropertyGroup>
+      <TcbLocTotal>@(TcbLines->Count())</TcbLocTotal>
+    </PropertyGroup>
+    <Error
+      Condition="$([MSBuild]::Add(0, $(TcbLocTotal))) &gt; $(TcbLocBudget)"
+      Code="TCB_LOC_BUDGET_EXCEEDED"
+      Text="Agentic.Check TCB line count $(TcbLocTotal) exceeds budget $(TcbLocBudget). See docs/tcb.md." />
+    <Message Importance="normal" Text="TCB LOC: $(TcbLocTotal) / $(TcbLocBudget)" />
+  </Target>
 
 </Project>

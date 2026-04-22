@@ -472,3 +472,22 @@ fourth E1 checklist box (`ReferenceInterpreter.cs` stubs with
   by the same grammar already satisfy "checker parses this, not
   arbitrary `.ag`" — the distinction doesn't buy safety).
 
+- **C9 — TCB audit document.** `docs/tcb.md` written and frozen (~180
+  lines). Six sections: what's in the TCB (per-file LOC table;
+  BCL-only dependency inventory; enumerated I/O — six read-only
+  operations, no network / no process / no env / no writes), the two
+  named axioms TA-1 (extractor soundness) and TA-2 (emitter implements
+  E1) cross-linked to `safety-policy.md`, an adversary-controls
+  attack-surface table, an explicit "what is *not* in the TCB" list,
+  a CI-gate description, and a six-step re-audit checklist targeted
+  at 30 minutes. **CI gate shipped**: new MSBuild target
+  `CheckTcbLocBudget` in `Agentic.Check.csproj` (`BeforeTargets=CoreCompile`)
+  reads every `*.cs` in the project, counts lines, and fails with
+  `error TCB_LOC_BUDGET_EXCEEDED` if the total exceeds the
+  `<TcbLocBudget>1500</TcbLocBudget>` property. Verified by
+  temporarily lowering the budget to 100 and observing the exact
+  error code from the build output; reverted. Current counts: 1020
+  MSBuild-counted lines (blank-stripped) / 1153 `wc -l`. Suite still
+  **354/354 passing**. No source or interpreter changes in this arc
+  — it is pure documentation + build-gate work.
+
