@@ -682,6 +682,21 @@ reject any binary whose `Φ` exceeds the manifest-declared capability set.
 **Acceptance.** Proof sketch is tight enough that a reviewer believes it.
 Not yet mechanized — that is E4 (post-paper).
 
+**Status (2026-04-22): shipped.** `docs/effects.md` written and frozen
+(~350 lines). Contents: the judgment `Γ ⊢ e : τ ! Φ`; types including
+the effect-bearing arrow `(τ̄) → τ ! Φ`; the effect lattice
+`(𝒫(Cap), ⊆, ∪, ∅)`; a full set of typing rules tagged to the matching
+E1 reduction rules (§4.2–§4.17) including the two capability rules
+**T-extern-decl** (pure) and **T-extern-call** (adds `{c}` to `Φ`);
+the subsumption rule `[T-sub]`; meta-theorems (progress, preservation,
+effect monotonicity, effect soundness) stated with proof sketches
+deferred to E3; an inference algorithm sketch (bottom-up, linear in
+AST × `|Cap|`); and three extension stubs (E2.1 higher-order, E2.2
+modules, E2.3 refinement effects). Cross-linked to
+`safety-policy.md` §3.1 (CS = `Φ_observed ⊆ Φ_declared`) and C7's
+`CapabilityExtractor` (the syntactic realization of §4.4 effect
+soundness).
+
 **Paper hook.** Section 5.2. The effect system is the formal counterpart
 of the capability manifest.
 
@@ -717,6 +732,22 @@ accepts, the three policy guarantees from C5 hold.
 trust-assumption is either (a) cited to prior art (e.g., SHA256), or
 (b) listed as future work to close (e.g., mechanized proof of emitter
 faithfulness).
+
+**Status (2026-04-22): shipped.** `docs/soundness.md` written and
+frozen (~250 lines). Contents: top-level theorem **TH-Check** ("if
+`agc-check` accepts, then CS/TC/CV all hold of `Π`"), decomposed into
+three clause theorems **TH-CS**, **TH-TC**, **TH-CV**; each proof
+sketch is stepwise and cites either an E1 rule number, an E2 rule,
+a specific line range in `Checker.Run`, or a named axiom. Three
+axioms precisely named: **TA-E** (emitter faithfulness ≡ TA-2),
+**TA-X** (extractor soundness ≡ TA-1), **TA-H** (SHA256 collision
+resistance — cited to FIPS 180-4). Dependency diagram at §6 shows
+TH-TC does **not** depend on TA-E, which is the paper's key claim:
+even a buggy transpiler cannot cause a failing test to be accepted.
+CV coverage caveat stated explicitly (contracts validated only on
+paths reached by tests). §7 is the Section 5 claim-sheet for the
+paper. §8 is a self-audit checklist. Cross-linked with
+`safety-policy.md`, `semantics.md`, `effects.md`, `tcb.md`.
 
 **Paper hook.** Section 5.3 — the theorem that the paper's title promises.
 

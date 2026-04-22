@@ -491,3 +491,40 @@ fourth E1 checklist box (`ReferenceInterpreter.cs` stubs with
   **354/354 passing**. No source or interpreter changes in this arc
   — it is pure documentation + build-gate work.
 
+- **E2 — type-and-capability-effect system.** `docs/effects.md` written
+  and frozen (~350 lines). Introduces the judgment `Γ ⊢ e : τ ! Φ` on
+  top of E1's reduction relation. Key technical moves: (a) arrow type
+  `(τ̄) → τ ! Φ` carries a *latent* effect — declaring a function is
+  pure; the latent `Φ` discharges at the call site; (b) capability
+  rules **T-extern-decl** (pure) and **T-extern-call** (adds `{c}`) are
+  the core of the system; (c) every rule is tagged to the matching
+  `semantics.md` §4.N reduction so E3 can proceed rule-by-rule; (d)
+  four meta-theorems stated — progress, preservation, effect
+  monotonicity, and effect soundness (`c ∈ Φ` for every capability `c`
+  invoked during reduction); (e) extension stubs for HOF (E2.1),
+  modules (E2.2), and refinement effects (E2.3) — each gets the right
+  rule shape so reviewers see the roadmap. Cross-links to
+  `safety-policy.md` §3.1 (CS statement) and to C7's
+  `CapabilityExtractor` (syntactic under-approximation of §4.4). No
+  code changes — pure formal-methods writing. Suite untouched
+  (**354/354**).
+
+- **E3 — soundness sketch.** `docs/soundness.md` written and frozen
+  (~250 lines). States **TH-Check** — "if `Checker.Run(Π) = Accept`
+  then CS ∧ TC ∧ CV" — decomposed into three lemmas. **TH-CS** chain
+  is six steps: checker-code → TA-X → TA-E → E2 §4.4 → E2 §5 →
+  checker-code. **TH-TC** stands on the reference interpreter alone
+  and is the paper's headline claim: it does *not* depend on TA-E,
+  meaning a buggy transpiler still can't sneak a failing test past
+  the checker. **TH-CV** reduces to TH-TC + E1 §4.17 contract rules,
+  with the coverage caveat (CV is quantified only over paths reached
+  by `μ.Tests`) stated in plain language. Three named axioms
+  consolidated: **TA-E** (emitter faithfulness = TA-2), **TA-X**
+  (extractor soundness = TA-1), **TA-H** (SHA-256 CR, cited to
+  FIPS 180-4). A §6 diagram makes the dependency shape explicit;
+  §7 is the paper's Section-5 claim sheet; §8 is a self-audit
+  checklist. Cross-linked with every prior E/C doc. No code changes.
+  Suite still **354/354**. With E3 landed, all pen-and-paper formal
+  methods artefacts (E1–E3) and all Arc-C artefacts (C1–C9) are
+  complete — remaining work is Arc D (evaluation + paper).
+
