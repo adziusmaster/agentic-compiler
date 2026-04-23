@@ -1,0 +1,18 @@
+(module Gcd
+  (defun gcd ((a : Num) (b : Num)) : Num
+    (def x : Num a)
+    (def y : Num b)
+    (while (> y 0)
+      (do
+        (def t : Num y)
+        (set y (math.mod x y))
+        (set x t)))
+    (return x))
+
+  (test zero_a  (assert-eq (gcd 0 5) 5))
+  (test zero_b  (assert-eq (gcd 7 0) 7))
+  (test same    (assert-eq (gcd 6 6) 6))
+  (test two     (assert-eq (gcd 12 18) 6))
+  (test coprime (assert-eq (gcd 17 5) 1))
+  (test large   (assert-eq (gcd 100 75) 25))
+  (test pow2    (assert-eq (gcd 48 36) 12)))

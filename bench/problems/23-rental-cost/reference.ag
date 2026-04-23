@@ -1,0 +1,33 @@
+(module RentalCost
+  (defun weeks_in ((days : Num)) : Num
+    (return (math.floor (/ days 7))))
+
+  (defun base_rental ((days : Num) (rate : Num)) : Num
+    (def w : Num (weeks_in days))
+    (def r : Num (- days (* w 7)))
+    (return (+ (* w (* 6 rate)) (* r rate))))
+
+  (defun insurance_total ((days : Num) (per_day : Num)) : Num
+    (return (* days per_day)))
+
+  (defun apply_loyalty ((amount : Num) (flag : Num)) : Num
+    (if (= flag 1) (return (* amount 0.9)) (return amount)))
+
+  (defun apply_tax ((amount : Num) (pct : Num)) : Num
+    (return (* amount (+ 1 (/ pct 100)))))
+
+  (defun round2 ((x : Num)) : Num
+    (return (/ (math.floor (+ (* x 100) 0.5)) 100)))
+
+  (defun rental_cost ((days : Num) (daily_rate : Num) (insurance_per_day : Num) (loyalty : Num) (tax_pct : Num)) : Num
+    (def base : Num (base_rental days daily_rate))
+    (def ins : Num (insurance_total days insurance_per_day))
+    (def pre : Num (apply_loyalty (+ base ins) loyalty))
+    (return (round2 (apply_tax pre tax_pct))))
+
+  (test one_day     (assert-near (rental_cost 1 50 10 0 0) 60 0.01))
+  (test week        (assert-near (rental_cost 7 50 10 0 0) 370 0.01))
+  (test eight_days  (assert-near (rental_cost 8 50 10 0 0) 430 0.01))
+  (test loyalty     (assert-near (rental_cost 7 50 10 1 0) 333 0.01))
+  (test with_tax    (assert-near (rental_cost 7 50 10 0 10) 407 0.01))
+  (test loyalty_tax (assert-near (rental_cost 7 50 10 1 10) 366.3 0.01)))

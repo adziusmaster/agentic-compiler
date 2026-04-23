@@ -1,0 +1,9 @@
+(extern defun env_read ((key : Str)) : Str @capability "env.get")
+
+(test empty_falls_back
+  (mocks (env.get "HOME" ""))
+  (assert-eq (home_or "/nowhere") "/nowhere"))
+
+(test present_wins
+  (mocks (env.get "HOME" "/root"))
+  (assert-eq (home_or "/nowhere") "/root"))

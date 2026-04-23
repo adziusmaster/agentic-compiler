@@ -1,0 +1,5 @@
+(test solo         (assert-near (per_person 100 10 20 1) 130 0.01))
+(test duo          (assert-near (per_person 100 10 20 2) 65 0.01))
+(test four         (assert-near (per_person 100 10 20 4) 32.5 0.01))
+(test round_up     (assert-near (per_person 100 10 20 3) 43.34 0.01))
+(test no_tip_tax   (assert-near (per_person 60 0 0 4) 15 0.01))

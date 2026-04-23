@@ -1,0 +1,6 @@
+(test empty    (assert-eq (reverse_string "") ""))
+(test single   (assert-eq (reverse_string "a") "a"))
+(test abc      (assert-eq (reverse_string "abc") "cba"))
+(test hello    (assert-eq (reverse_string "hello world") "dlrow olleh"))
+(test palindrome (assert-eq (reverse_string "level") "level"))
+(test digits   (assert-eq (reverse_string "12345") "54321"))

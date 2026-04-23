@@ -1,0 +1,5 @@
+(test thin       (assert-eq (bmi_category 45 170) "underweight"))
+(test normal     (assert-eq (bmi_category 70 175) "normal"))
+(test over       (assert-eq (bmi_category 85 175) "overweight"))
+(test obese      (assert-eq (bmi_category 110 175) "obese"))
+(test boundary   (assert-eq (bmi_category 76.5625 175) "overweight"))

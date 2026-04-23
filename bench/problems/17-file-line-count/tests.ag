@@ -1,0 +1,8 @@
+(extern defun file_read ((path : Str)) : Str @capability "file.read")
+
+(test empty          (mocks (file.read "/f" "")) (assert-eq (line_count "/f") 0))
+(test one_terminated (mocks (file.read "/f" "a\n")) (assert-eq (line_count "/f") 1))
+(test two_terminated (mocks (file.read "/f" "a\nb\n")) (assert-eq (line_count "/f") 2))
+(test two_no_final   (mocks (file.read "/f" "a\nb")) (assert-eq (line_count "/f") 2))
+(test just_newline   (mocks (file.read "/f" "\n")) (assert-eq (line_count "/f") 1))
+(test double_nl      (mocks (file.read "/f" "\n\n")) (assert-eq (line_count "/f") 2))

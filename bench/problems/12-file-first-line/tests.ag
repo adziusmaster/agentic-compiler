@@ -1,0 +1,13 @@
+(extern defun file_read ((path : Str)) : Str @capability "file.read")
+
+(test two_line
+  (mocks (file.read "/etc/hosts" "alpha\nbeta"))
+  (assert-eq (first_line "/etc/hosts") "alpha"))
+
+(test trailing_newline
+  (mocks (file.read "/etc/hosts" "only\n"))
+  (assert-eq (first_line "/etc/hosts") "only"))
+
+(test no_newline
+  (mocks (file.read "/etc/hosts" "whole"))
+  (assert-eq (first_line "/etc/hosts") "whole"))

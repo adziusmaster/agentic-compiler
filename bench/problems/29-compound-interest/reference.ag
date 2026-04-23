@@ -1,0 +1,27 @@
+(module CompoundInterest
+  (defun period_rate ((annual_pct : Num) (periods_per_year : Num)) : Num
+    (return (/ (/ annual_pct 100) periods_per_year)))
+
+  (defun total_periods ((periods_per_year : Num) (years : Num)) : Num
+    (return (* periods_per_year years)))
+
+  (defun growth ((r : Num) (n : Num)) : Num
+    (return (math.pow (+ 1 r) n)))
+
+  (defun final_amount ((principal : Num) (g : Num)) : Num
+    (return (* principal g)))
+
+  (defun round2 ((x : Num)) : Num
+    (return (/ (math.floor (+ (* x 100) 0.5)) 100)))
+
+  (defun compound ((principal : Num) (annual_rate_pct : Num) (periods_per_year : Num) (years : Num)) : Num
+    (def r : Num (period_rate annual_rate_pct periods_per_year))
+    (def n : Num (total_periods periods_per_year years))
+    (def g : Num (growth r n))
+    (return (round2 (final_amount principal g))))
+
+  (test annual        (assert-near (compound 1000 5 1 10) 1628.89 0.05))
+  (test monthly       (assert-near (compound 1000 10 12 5) 1645.31 0.05))
+  (test zero_rate     (assert-near (compound 5000 0 4 10) 5000 0.01))
+  (test double        (assert-near (compound 100 100 1 1) 200 0.01))
+  (test semiannual    (assert-near (compound 2000 6 2 3) 2388.10 0.05)))

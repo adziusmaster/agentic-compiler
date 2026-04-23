@@ -1,0 +1,24 @@
+(module TipSplit
+  (defun tax_amount ((subtotal : Num) (pct : Num)) : Num
+    (return (* subtotal (/ pct 100))))
+
+  (defun tip_amount ((subtotal : Num) (pct : Num)) : Num
+    (return (* subtotal (/ pct 100))))
+
+  (defun grand_total ((subtotal : Num) (tax : Num) (tip : Num)) : Num
+    (return (+ subtotal (+ tax tip))))
+
+  (defun ceil_cents ((x : Num)) : Num
+    (return (/ (math.ceil (* x 100)) 100)))
+
+  (defun per_person ((subtotal : Num) (tax_pct : Num) (tip_pct : Num) (people : Num)) : Num
+    (def tx : Num (tax_amount subtotal tax_pct))
+    (def tp : Num (tip_amount subtotal tip_pct))
+    (def total : Num (grand_total subtotal tx tp))
+    (return (ceil_cents (/ total people))))
+
+  (test solo         (assert-near (per_person 100 10 20 1) 130 0.01))
+  (test duo          (assert-near (per_person 100 10 20 2) 65 0.01))
+  (test four         (assert-near (per_person 100 10 20 4) 32.5 0.01))
+  (test round_up     (assert-near (per_person 100 10 20 3) 43.34 0.01))
+  (test no_tip_tax   (assert-near (per_person 60 0 0 4) 15 0.01)))

@@ -1,0 +1,26 @@
+(module BalancedParens
+  (defun is_balanced ((s : Str)) : Num
+    (def n : Num (str.length s))
+    (def depth : Num 0)
+    (def i : Num 0)
+    (while (< i n)
+      (do
+        (def ch : Str (str.substring s i 1))
+        (if (str.eq ch "(") (set depth (+ depth 1)) 0)
+        (if (str.eq ch ")")
+          (do
+            (set depth (- depth 1))
+            (if (< depth 0) (return 0) 0))
+          0)
+        (set i (+ i 1))))
+    (if (= depth 0) (return 1) (return 0)))
+
+  (test empty       (assert-eq (is_balanced "") 1))
+  (test pair        (assert-eq (is_balanced "()") 1))
+  (test nested      (assert-eq (is_balanced "(())") 1))
+  (test siblings    (assert-eq (is_balanced "(()())") 1))
+  (test ignore      (assert-eq (is_balanced "(a(b)c)") 1))
+  (test reversed    (assert-eq (is_balanced ")(") 0))
+  (test unclosed    (assert-eq (is_balanced "((") 0))
+  (test trailing    (assert-eq (is_balanced "())") 0))
+  (test bare_text   (assert-eq (is_balanced "abc") 1)))

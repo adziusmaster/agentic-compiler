@@ -1,0 +1,9 @@
+(extern defun file_write ((path : Str) (body : Str)) : Num @capability "file.write")
+
+(test returns_write_code
+  (mocks (file.write "/tmp/s.txt" 1))
+  (assert-eq (save_status "/tmp/s.txt" 7) 1))
+
+(test zero_count
+  (mocks (file.write "/tmp/s.txt" 1))
+  (assert-eq (save_status "/tmp/s.txt" 0) 1))

@@ -1,0 +1,26 @@
+(module BmiCategory
+  (defun meters ((cm : Num)) : Num
+    (return (/ cm 100)))
+
+  (defun meters_sq ((cm : Num)) : Num
+    (def m : Num (meters cm))
+    (return (* m m)))
+
+  (defun compute_bmi ((kg : Num) (cm : Num)) : Num
+    (return (/ kg (meters_sq cm))))
+
+  (defun classify ((bmi : Num)) : Str
+    (if (< bmi 18.5) (return "underweight") 0)
+    (if (< bmi 25) (return "normal") 0)
+    (if (< bmi 30) (return "overweight") 0)
+    (return "obese"))
+
+  (defun bmi_category ((kg : Num) (cm : Num)) : Str
+    (def bmi : Num (compute_bmi kg cm))
+    (return (classify bmi)))
+
+  (test thin       (assert-eq (bmi_category 45 170) "underweight"))
+  (test normal     (assert-eq (bmi_category 70 175) "normal"))
+  (test over       (assert-eq (bmi_category 85 175) "overweight"))
+  (test obese      (assert-eq (bmi_category 110 175) "obese"))
+  (test boundary   (assert-eq (bmi_category 76.5625 175) "overweight")))

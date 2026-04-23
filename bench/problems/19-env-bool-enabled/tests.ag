@@ -1,0 +1,10 @@
+(extern defun env_read ((key : Str)) : Str @capability "env.get")
+
+(test empty      (mocks (env.get "FEATURE_X" ""))     (assert-eq (is_enabled) 0))
+(test zero_str   (mocks (env.get "FEATURE_X" "0"))    (assert-eq (is_enabled) 0))
+(test one_str    (mocks (env.get "FEATURE_X" "1"))    (assert-eq (is_enabled) 1))
+(test true_lc    (mocks (env.get "FEATURE_X" "true")) (assert-eq (is_enabled) 1))
+(test true_uc    (mocks (env.get "FEATURE_X" "TRUE")) (assert-eq (is_enabled) 1))
+(test yes_mixed  (mocks (env.get "FEATURE_X" "Yes"))  (assert-eq (is_enabled) 1))
+(test on_mixed   (mocks (env.get "FEATURE_X" "On"))   (assert-eq (is_enabled) 1))
+(test garbage    (mocks (env.get "FEATURE_X" "nope")) (assert-eq (is_enabled) 0))

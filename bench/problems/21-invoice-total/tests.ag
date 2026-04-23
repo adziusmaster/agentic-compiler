@@ -1,0 +1,6 @@
+(test plain         (assert-near (invoice_total 10 2 0 0 0) 20 0.01))
+(test with_tax      (assert-near (invoice_total 10 2 0 10 0) 22 0.01))
+(test with_discount (assert-near (invoice_total 10 2 10 0 0) 18 0.01))
+(test shipping_only (assert-near (invoice_total 0 0 0 0 5) 5 0.01))
+(test full          (assert-near (invoice_total 100 3 10 20 5) 329 0.01))
+(test zero_qty      (assert-near (invoice_total 50 0 10 20 5) 5 0.01))

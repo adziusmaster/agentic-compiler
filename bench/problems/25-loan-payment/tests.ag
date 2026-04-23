@@ -1,0 +1,4 @@
+(test zero_rate     (assert-near (monthly_payment 12000 0 1) 1000 0.01))
+(test simple        (assert-near (monthly_payment 100000 6 30) 599.55 0.05))
+(test short_term    (assert-near (monthly_payment 10000 5 2) 438.71 0.05))
+(test high_interest (assert-near (monthly_payment 5000 20 1) 463.17 0.05))

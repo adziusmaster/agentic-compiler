@@ -1,0 +1,33 @@
+(module ShippingCost
+  (defun base_cost () : Num
+    (return 5.00))
+
+  (defun weight_surcharge ((weight_lbs : Num)) : Num
+    (return (* weight_lbs 0.50)))
+
+  (defun zone_modifier ((zone : Num)) : Num
+    (if (= zone 0) (return 0) 0)
+    (if (= zone 1) (return 2) 0)
+    (if (= zone 2) (return 5) 0)
+    (return 10))
+
+  (defun express_upcharge ((express : Num)) : Num
+    (if (= express 1) (return 15) 0)
+    (return 0))
+
+  (defun round2 ((x : Num)) : Num
+    (return (/ (math.floor (+ (* x 100) 0.5)) 100)))
+
+  (defun shipping_cost ((weight_lbs : Num) (zone : Num) (express : Num)) : Num
+    (def b : Num (base_cost))
+    (def w : Num (weight_surcharge weight_lbs))
+    (def z : Num (zone_modifier zone))
+    (def e : Num (express_upcharge express))
+    (return (round2 (+ b (+ w (+ z e))))))
+
+  (test minimal    (assert-near (shipping_cost 0 0 0) 5.00 0.01))
+  (test zone_only  (assert-near (shipping_cost 0 2 0) 10.00 0.01))
+  (test weighted   (assert-near (shipping_cost 4 0 0) 7.00 0.01))
+  (test express    (assert-near (shipping_cost 0 0 1) 20.00 0.01))
+  (test combined   (assert-near (shipping_cost 10 3 1) 35.00 0.01))
+  (test fractional (assert-near (shipping_cost 2.5 1 0) 8.25 0.01)))

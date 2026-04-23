@@ -208,24 +208,33 @@ roadmap.
 
 ### Weeks 11–12 — D1 benchmark suite
 
-**D1.1 scaffolding.** `bench/` directory with a `run.py` (or shell script)
-that takes a provider + API key, runs all 30 problems, records per-problem
-metrics to `bench/results/<date>/results.jsonl`. Each problem lives in
-`bench/problems/NN-name/` with `objective.md`, `tests.ag`, and optionally
-a `functions.ag` for constrained problems.
+**D1.1 scaffolding (DONE).** `bench/run.py` harness takes a provider + API
+key and runs all 30 problems on any of three tracks (`agc`, `python`,
+`python-oneshot`), recording per-problem metrics to
+`bench/results/<date>/<track>.jsonl`. Problem layout:
+`bench/problems/NN-slug/` with `objective.md`, `tests.ag`, `tests.py`,
+`reference.ag`, and `meta.json` (capabilities + mocks).
 
-**D1.2 problems.** 30 problems authored. Coverage:
+**D1.2 problems (DONE).** 30 problems authored, every reference
+implementation validates against `agc check`:
 
-- 10 pure-logic (parsing, transformation, data-structure ops).
-- 10 capability-using (http, file, db, env, process — two each).
-- 10 multi-helper decomposition (5–15 helpers each).
+- 10 pure-logic (01–10: word-count, reverse-words, sum-digits, is-prime,
+  gcd, fibonacci, balanced-parens, max-in-array, count-char, reverse-string).
+- 10 capability-using (11–20: env/file/http/db flavors; mocks encoded in
+  `tests.ag`).
+- 10 multi-helper decomposition (21–30: invoice-total, paycheck-net,
+  rental-cost, tip-split, loan-payment, tax-progressive, bmi-category,
+  shipping-cost, compound-interest, grade-average).
 
-**D1.3 baseline.** `bench/python_baseline/` — same 30 objectives, expects
-LLM to write Python + pytest; harness runs `pytest` as the retry oracle.
-Same metrics as AgenticCompiler run.
+**D1.3 baseline (DONE).** Two Python comparators live inside the harness:
+`--track python` is the 5-attempt retry oracle (pytest feedback loop);
+`--track python-oneshot` is the single-attempt control. Both share
+objectives, tests, and metrics with the `agc` track — the gap between the
+two Python tracks isolates "retry oracle budget" from "AgC verifier".
 
-**D1 exit.** One run of both tracks completes. Results committed. No
-crashes outside the scheduled 3-attempt reflection budget.
+**D1 exit (PENDING).** One run of each of the three tracks completes,
+results committed. Blocks on API key availability; harness `--dry-run`
+confirms all 30 problems loadable.
 
 ### Week 13 — D2 auditability study
 

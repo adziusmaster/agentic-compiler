@@ -1,0 +1,6 @@
+(test one_day     (assert-near (rental_cost 1 50 10 0 0) 60 0.01))
+(test week        (assert-near (rental_cost 7 50 10 0 0) 370 0.01))
+(test eight_days  (assert-near (rental_cost 8 50 10 0 0) 430 0.01))
+(test loyalty     (assert-near (rental_cost 7 50 10 1 0) 333 0.01))
+(test with_tax    (assert-near (rental_cost 7 50 10 0 10) 407 0.01))
+(test loyalty_tax (assert-near (rental_cost 7 50 10 1 10) 366.3 0.01))

@@ -1,0 +1,7 @@
+(test perfect    (assert-eq (letter_grade 100 100 100 100) "A"))
+(test mixed_b    (assert-eq (letter_grade 95 88 72 60) "B"))
+(test low_f      (assert-eq (letter_grade 60 55 50 45) "F"))
+(test high_a     (assert-eq (letter_grade 100 90 90 50) "A"))
+(test drop_zero  (assert-eq (letter_grade 80 80 80 0) "B"))
+(test c_grade    (assert-eq (letter_grade 70 70 70 10) "C"))
+(test d_grade    (assert-eq (letter_grade 65 65 65 0) "D"))

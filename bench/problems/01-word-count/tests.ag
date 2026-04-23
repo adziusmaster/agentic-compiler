@@ -1,0 +1,7 @@
+(test empty    (assert-eq (word_count "") 0))
+(test one      (assert-eq (word_count "hello") 1))
+(test two      (assert-eq (word_count "hello world") 2))
+(test leading  (assert-eq (word_count "  hi") 1))
+(test trailing (assert-eq (word_count "hi  ") 1))
+(test collapse (assert-eq (word_count "a  b   c") 3))
+(test tabs     (assert-eq (word_count "a	b	c") 3))

@@ -1,0 +1,23 @@
+(module FileCopy
+  (extern defun file_read  ((path : Str)) : Str @capability "file.read")
+  (extern defun file_write ((path : Str) (body : Str)) : Num @capability "file.write")
+
+  (defun copy_file ((src : Str) (dst : Str)) : Num
+    (def body : Str (file_read src))
+    (file_write dst body)
+    (return (str.length body)))
+
+  (test copies_five
+    (mocks (file.read  "/src.txt" "hello")
+           (file.write "/dst.txt" 1))
+    (assert-eq (copy_file "/src.txt" "/dst.txt") 5))
+
+  (test copies_empty
+    (mocks (file.read  "/src.txt" "")
+           (file.write "/dst.txt" 1))
+    (assert-eq (copy_file "/src.txt" "/dst.txt") 0))
+
+  (test copies_long
+    (mocks (file.read  "/src.txt" "abcdefghijklmnopqrst")
+           (file.write "/dst.txt" 1))
+    (assert-eq (copy_file "/src.txt" "/dst.txt") 20)))

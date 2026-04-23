@@ -1,0 +1,29 @@
+(module DbUrl
+  (extern defun env_read ((key : Str)) : Str @capability "env.get")
+
+  (defun db_url () : Str
+    (def h : Str (env_read "DB_HOST"))
+    (def p : Str (env_read "DB_PORT"))
+    (if (str.eq h "") (return "localhost:5432") 0)
+    (if (str.eq p "") (return "localhost:5432") 0)
+    (return (str.concat h (str.concat ":" p))))
+
+  (test both_present
+    (mocks (env.get "DB_HOST" "db.example.com")
+           (env.get "DB_PORT" "5555"))
+    (assert-eq (db_url) "db.example.com:5555"))
+
+  (test host_missing
+    (mocks (env.get "DB_HOST" "")
+           (env.get "DB_PORT" "5555"))
+    (assert-eq (db_url) "localhost:5432"))
+
+  (test port_missing
+    (mocks (env.get "DB_HOST" "db.example.com")
+           (env.get "DB_PORT" ""))
+    (assert-eq (db_url) "localhost:5432"))
+
+  (test both_missing
+    (mocks (env.get "DB_HOST" "")
+           (env.get "DB_PORT" ""))
+    (assert-eq (db_url) "localhost:5432")))

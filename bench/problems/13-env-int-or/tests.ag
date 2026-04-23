@@ -1,0 +1,13 @@
+(extern defun env_read ((key : Str)) : Str @capability "env.get")
+
+(test default_when_empty
+  (mocks (env.get "PORT" ""))
+  (assert-eq (port_or 8080) 8080))
+
+(test parses_present
+  (mocks (env.get "PORT" "3000"))
+  (assert-eq (port_or 8080) 3000))
+
+(test reads_zero
+  (mocks (env.get "PORT" "0"))
+  (assert-eq (port_or 8080) 0))

@@ -1,0 +1,19 @@
+(module ReverseWords
+  (defun reverse_words ((text : Str)) : Str
+    (if (str.eq text "") (return "") 0)
+    (def parts : (Array Str) (str.split text " "))
+    (def n : Num (arr.length parts))
+    (def out : Str "")
+    (def i : Num (- n 1))
+    (while (>= i 0)
+      (do
+        (if (< i (- n 1)) (set out (str.concat out " ")) 0)
+        (set out (str.concat out (arr.get parts i)))
+        (set i (- i 1))))
+    (return out))
+
+  (test empty  (assert-eq (reverse_words "") ""))
+  (test single (assert-eq (reverse_words "a") "a"))
+  (test two    (assert-eq (reverse_words "hello world") "world hello"))
+  (test three  (assert-eq (reverse_words "one two three") "three two one"))
+  (test four   (assert-eq (reverse_words "the quick brown fox") "fox brown quick the")))

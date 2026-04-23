@@ -1,0 +1,25 @@
+(module InvoiceTotal
+  (defun subtotal ((unit : Num) (qty : Num)) : Num
+    (return (* unit qty)))
+
+  (defun apply_discount ((amount : Num) (pct : Num)) : Num
+    (return (- amount (/ (* amount pct) 100))))
+
+  (defun apply_tax ((amount : Num) (pct : Num)) : Num
+    (return (* amount (+ 1 (/ pct 100)))))
+
+  (defun round2 ((x : Num)) : Num
+    (return (/ (math.floor (+ (* x 100) 0.5)) 100)))
+
+  (defun invoice_total ((unit_price : Num) (quantity : Num) (discount_pct : Num) (tax_pct : Num) (shipping : Num)) : Num
+    (def s : Num (subtotal unit_price quantity))
+    (def d : Num (apply_discount s discount_pct))
+    (def t : Num (apply_tax d tax_pct))
+    (return (round2 (+ t shipping))))
+
+  (test plain         (assert-near (invoice_total 10 2 0 0 0) 20 0.01))
+  (test with_tax      (assert-near (invoice_total 10 2 0 10 0) 22 0.01))
+  (test with_discount (assert-near (invoice_total 10 2 10 0 0) 18 0.01))
+  (test shipping_only (assert-near (invoice_total 0 0 0 0 5) 5 0.01))
+  (test full          (assert-near (invoice_total 100 3 10 20 5) 329 0.01))
+  (test zero_qty      (assert-near (invoice_total 50 0 10 20 5) 5 0.01)))

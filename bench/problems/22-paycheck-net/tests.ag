@@ -1,0 +1,4 @@
+(test no_overtime  (assert-near (net_pay 40 20 10 5) 624.92 0.05))
+(test with_overtime (assert-near (net_pay 50 20 10 5) 859.27 0.05))
+(test zero_hours   (assert-near (net_pay 0 20 10 5) 0 0.01))
+(test no_tax       (assert-near (net_pay 40 10 0 0) 369.4 0.05))

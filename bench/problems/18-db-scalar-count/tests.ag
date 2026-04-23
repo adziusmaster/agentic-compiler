@@ -1,0 +1,13 @@
+(extern defun sql_scalar ((conn : Str) (sql : Str)) : Str @capability "db.query")
+
+(test zero
+  (mocks (db.query "Data Source=:memory:" "0"))
+  (assert-eq (count_users "Data Source=:memory:") 0))
+
+(test three
+  (mocks (db.query "Data Source=:memory:" "3"))
+  (assert-eq (count_users "Data Source=:memory:") 3))
+
+(test large
+  (mocks (db.query "Data Source=:memory:" "1000"))
+  (assert-eq (count_users "Data Source=:memory:") 1000))

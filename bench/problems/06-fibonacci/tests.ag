@@ -1,0 +1,8 @@
+(test f0  (assert-eq (fib 0) 0))
+(test f1  (assert-eq (fib 1) 1))
+(test f2  (assert-eq (fib 2) 1))
+(test f3  (assert-eq (fib 3) 2))
+(test f5  (assert-eq (fib 5) 5))
+(test f10 (assert-eq (fib 10) 55))
+(test f20 (assert-eq (fib 20) 6765))
+(test f30 (assert-eq (fib 30) 832040))

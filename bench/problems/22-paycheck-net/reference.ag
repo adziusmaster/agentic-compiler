@@ -1,0 +1,29 @@
+(module NetPay
+  (defun gross_pay ((hours : Num) (rate : Num)) : Num
+    (if (<= hours 40)
+      (return (* hours rate))
+      (return (+ (* 40 rate) (* (- hours 40) (* rate 1.5))))))
+
+  (defun fica ((gross : Num)) : Num
+    (return (* gross 0.0765)))
+
+  (defun federal ((gross : Num) (fica_v : Num) (pct : Num)) : Num
+    (return (* (- gross fica_v) (/ pct 100))))
+
+  (defun state_tax ((gross : Num) (pct : Num)) : Num
+    (return (* gross (/ pct 100))))
+
+  (defun round2 ((x : Num)) : Num
+    (return (/ (math.floor (+ (* x 100) 0.5)) 100)))
+
+  (defun net_pay ((hours : Num) (rate : Num) (fed_pct : Num) (state_pct : Num)) : Num
+    (def g : Num (gross_pay hours rate))
+    (def f : Num (fica g))
+    (def fed : Num (federal g f fed_pct))
+    (def st : Num (state_tax g state_pct))
+    (return (round2 (- g (+ f (+ fed st))))))
+
+  (test no_overtime  (assert-near (net_pay 40 20 10 5) 624.92 0.05))
+  (test with_overtime (assert-near (net_pay 50 20 10 5) 859.27 0.05))
+  (test zero_hours   (assert-near (net_pay 0 20 10 5) 0 0.01))
+  (test no_tax       (assert-near (net_pay 40 10 0 0) 369.4 0.05)))

@@ -1,0 +1,6 @@
+(test minimal    (assert-near (shipping_cost 0 0 0) 5.00 0.01))
+(test zone_only  (assert-near (shipping_cost 0 2 0) 10.00 0.01))
+(test weighted   (assert-near (shipping_cost 4 0 0) 7.00 0.01))
+(test express    (assert-near (shipping_cost 0 0 1) 20.00 0.01))
+(test combined   (assert-near (shipping_cost 10 3 1) 35.00 0.01))
+(test fractional (assert-near (shipping_cost 2.5 1 0) 8.25 0.01))

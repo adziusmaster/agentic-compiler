@@ -1,0 +1,14 @@
+(module EnvOrDefault
+  (extern defun env_read ((key : Str)) : Str @capability "env.get")
+
+  (defun home_or ((fallback : Str)) : Str
+    (def v : Str (env_read "HOME"))
+    (if (str.eq v "") (return fallback) (return v)))
+
+  (test empty_falls_back
+    (mocks (env.get "HOME" ""))
+    (assert-eq (home_or "/nowhere") "/nowhere"))
+
+  (test present_wins
+    (mocks (env.get "HOME" "/root"))
+    (assert-eq (home_or "/nowhere") "/root")))

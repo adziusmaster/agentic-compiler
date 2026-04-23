@@ -1,0 +1,35 @@
+(module GradeAverage
+  (defun min2 ((a : Num) (b : Num)) : Num
+    (if (< a b) (return a) 0)
+    (return b))
+
+  (defun min_of_four ((a : Num) (b : Num) (c : Num) (d : Num)) : Num
+    (return (min2 (min2 a b) (min2 c d))))
+
+  (defun sum_of_four ((a : Num) (b : Num) (c : Num) (d : Num)) : Num
+    (return (+ a (+ b (+ c d)))))
+
+  (defun dropped_sum ((a : Num) (b : Num) (c : Num) (d : Num)) : Num
+    (return (- (sum_of_four a b c d) (min_of_four a b c d))))
+
+  (defun average_three ((a : Num) (b : Num) (c : Num) (d : Num)) : Num
+    (return (/ (dropped_sum a b c d) 3)))
+
+  (defun classify ((avg : Num)) : Str
+    (if (>= avg 90) (return "A") 0)
+    (if (>= avg 80) (return "B") 0)
+    (if (>= avg 70) (return "C") 0)
+    (if (>= avg 60) (return "D") 0)
+    (return "F"))
+
+  (defun letter_grade ((s1 : Num) (s2 : Num) (s3 : Num) (s4 : Num)) : Str
+    (def avg : Num (average_three s1 s2 s3 s4))
+    (return (classify avg)))
+
+  (test perfect    (assert-eq (letter_grade 100 100 100 100) "A"))
+  (test mixed_b    (assert-eq (letter_grade 95 88 72 60) "B"))
+  (test low_f      (assert-eq (letter_grade 60 55 50 45) "F"))
+  (test high_a     (assert-eq (letter_grade 100 90 90 50) "A"))
+  (test drop_zero  (assert-eq (letter_grade 80 80 80 0) "B"))
+  (test c_grade    (assert-eq (letter_grade 70 70 70 10) "C"))
+  (test d_grade    (assert-eq (letter_grade 65 65 65 0) "D")))

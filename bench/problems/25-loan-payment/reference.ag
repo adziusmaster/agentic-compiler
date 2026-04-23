@@ -1,0 +1,27 @@
+(module LoanPayment
+  (defun monthly_rate ((annual_pct : Num)) : Num
+    (return (/ (/ annual_pct 100) 12)))
+
+  (defun total_periods ((years : Num)) : Num
+    (return (* years 12)))
+
+  (defun growth ((r : Num) (n : Num)) : Num
+    (return (math.pow (+ 1 r) n)))
+
+  (defun amortize ((p : Num) (r : Num) (n : Num)) : Num
+    (def g : Num (growth r n))
+    (return (/ (* p (* r g)) (- g 1))))
+
+  (defun round2 ((x : Num)) : Num
+    (return (/ (math.floor (+ (* x 100) 0.5)) 100)))
+
+  (defun monthly_payment ((principal : Num) (annual_rate_pct : Num) (years : Num)) : Num
+    (def r : Num (monthly_rate annual_rate_pct))
+    (def n : Num (total_periods years))
+    (if (= r 0) (return (round2 (/ principal n))) 0)
+    (return (round2 (amortize principal r n))))
+
+  (test zero_rate     (assert-near (monthly_payment 12000 0 1) 1000 0.01))
+  (test simple        (assert-near (monthly_payment 100000 6 30) 599.55 0.05))
+  (test short_term    (assert-near (monthly_payment 10000 5 2) 438.71 0.05))
+  (test high_interest (assert-near (monthly_payment 5000 20 1) 463.17 0.05)))

@@ -1,0 +1,36 @@
+(module ArrMax
+  (defun arr_max ((xs : (Array Num)) (size : Num)) : Num
+    (def best : Num (arr.get xs 0))
+    (def i : Num 1)
+    (while (< i size)
+      (do
+        (def v : Num (arr.get xs i))
+        (if (> v best) (set best v) 0)
+        (set i (+ i 1))))
+    (return best))
+
+  (test single
+    (do
+      (def a : (Array Num) (arr.new 1))
+      (arr.set a 0 42)
+      (assert-eq (arr_max a 1) 42)))
+
+  (test eight
+    (do
+      (def a : (Array Num) (arr.new 8))
+      (arr.set a 0 3) (arr.set a 1 1) (arr.set a 2 4) (arr.set a 3 1)
+      (arr.set a 4 5) (arr.set a 5 9) (arr.set a 6 2) (arr.set a 7 6)
+      (assert-eq (arr_max a 8) 9)))
+
+  (test negatives
+    (do
+      (def a : (Array Num) (arr.new 3))
+      (arr.set a 0 -7) (arr.set a 1 -2) (arr.set a 2 -5)
+      (assert-eq (arr_max a 3) -2)))
+
+  (test prefix_only
+    (do
+      (def a : (Array Num) (arr.new 5))
+      (arr.set a 0 1) (arr.set a 1 2) (arr.set a 2 3)
+      (arr.set a 3 100) (arr.set a 4 100)
+      (assert-eq (arr_max a 3) 3))))

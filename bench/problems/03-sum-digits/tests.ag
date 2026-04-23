@@ -1,0 +1,6 @@
+(test zero   (assert-eq (sum_digits 0) 0))
+(test single (assert-eq (sum_digits 9) 9))
+(test two    (assert-eq (sum_digits 23) 5))
+(test three  (assert-eq (sum_digits 123) 6))
+(test zeros  (assert-eq (sum_digits 1000) 1))
+(test big    (assert-eq (sum_digits 99999) 45))

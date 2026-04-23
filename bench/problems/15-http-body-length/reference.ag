@@ -1,0 +1,17 @@
+(module BodyLength
+  (extern defun http_fetch ((url : Str)) : Str @capability "http.fetch")
+
+  (defun body_length ((url : Str)) : Num
+    (return (str.length (http_fetch url))))
+
+  (test hello_body
+    (mocks (http.fetch "https://x.example/data" "hello"))
+    (assert-eq (body_length "https://x.example/data") 5))
+
+  (test empty_body
+    (mocks (http.fetch "https://x.example/data" ""))
+    (assert-eq (body_length "https://x.example/data") 0))
+
+  (test json_body
+    (mocks (http.fetch "https://x.example/data" "{\"a\":1}"))
+    (assert-eq (body_length "https://x.example/data") 7)))

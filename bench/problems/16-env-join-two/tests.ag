@@ -1,0 +1,21 @@
+(extern defun env_read ((key : Str)) : Str @capability "env.get")
+
+(test both_present
+  (mocks (env.get "DB_HOST" "db.example.com")
+         (env.get "DB_PORT" "5555"))
+  (assert-eq (db_url) "db.example.com:5555"))
+
+(test host_missing
+  (mocks (env.get "DB_HOST" "")
+         (env.get "DB_PORT" "5555"))
+  (assert-eq (db_url) "localhost:5432"))
+
+(test port_missing
+  (mocks (env.get "DB_HOST" "db.example.com")
+         (env.get "DB_PORT" ""))
+  (assert-eq (db_url) "localhost:5432"))
+
+(test both_missing
+  (mocks (env.get "DB_HOST" "")
+         (env.get "DB_PORT" ""))
+  (assert-eq (db_url) "localhost:5432"))

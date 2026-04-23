@@ -1,0 +1,22 @@
+(module Fibonacci
+  (defun fib ((n : Num)) : Num
+    (if (< n 2) (return n) 0)
+    (def a : Num 0)
+    (def b : Num 1)
+    (def i : Num 2)
+    (while (<= i n)
+      (do
+        (def c : Num (+ a b))
+        (set a b)
+        (set b c)
+        (set i (+ i 1))))
+    (return b))
+
+  (test f0  (assert-eq (fib 0) 0))
+  (test f1  (assert-eq (fib 1) 1))
+  (test f2  (assert-eq (fib 2) 1))
+  (test f3  (assert-eq (fib 3) 2))
+  (test f5  (assert-eq (fib 5) 5))
+  (test f10 (assert-eq (fib 10) 55))
+  (test f20 (assert-eq (fib 20) 6765))
+  (test f30 (assert-eq (fib 30) 832040)))

@@ -758,17 +758,20 @@ paper. §8 is a self-audit checklist. Cross-linked with
 HumanEval and MBPP measure task completion, not auditability. Build a
 suite that measures what the thesis claims.
 
-**Deliverables.**
+**Deliverables (infrastructure SHIPPED; live run pending API key).**
 
-- `bench/` directory with ~30 problems: natural-language objective +
-  acceptance tests. Coverage: pure logic (parsing, transformation),
-  capability-using (HTTP, file, time), multi-helper decomposition (5–15
-  helpers).
-- For each problem, track: pass rate, decomposition depth (helpers,
-  modules), attempts/tokens/wall-time to first green, capability set,
-  source size.
-- Baseline: same problems solved by LLM-writes-Python with pytest as the
-  retry oracle. Same metrics.
+- `bench/` directory with 30 problems: natural-language objective +
+  `.ag` tests + `.py` tests + reference `.ag` + `meta.json`. Coverage:
+  10 pure-logic (01–10), 10 capability-using with mocks (11–20), 10
+  multi-helper decomposition (21–30). Every reference validates via
+  `agc check` (147 tests pass across the 30 references).
+- `bench/run.py` harness: records per-problem `pass`, `attempts`,
+  `wall_time_s`, `tokens_in/out`, `source_loc`, `capabilities`,
+  `decomposition_depth`, `error_category`.
+- Three tracks: `agc` (AgC agent + check), `python` (retry oracle, 5
+  attempts of pytest feedback), `python-oneshot` (single attempt). The
+  two Python tracks isolate "retry budget" from "AgC verifier" to
+  sharpen the verifiability-gap story.
 
 ### D2 — Auditability study
 

@@ -1,0 +1,19 @@
+(module FirstLine
+  (extern defun file_read ((path : Str)) : Str @capability "file.read")
+
+  (defun first_line ((path : Str)) : Str
+    (def contents : Str (file_read path))
+    (def nl : Num (str.index_of contents "\n"))
+    (if (< nl 0) (return contents) (return (str.substring contents 0 nl))))
+
+  (test two_line
+    (mocks (file.read "/etc/hosts" "alpha\nbeta"))
+    (assert-eq (first_line "/etc/hosts") "alpha"))
+
+  (test trailing_newline
+    (mocks (file.read "/etc/hosts" "only\n"))
+    (assert-eq (first_line "/etc/hosts") "only"))
+
+  (test no_newline
+    (mocks (file.read "/etc/hosts" "whole"))
+    (assert-eq (first_line "/etc/hosts") "whole")))

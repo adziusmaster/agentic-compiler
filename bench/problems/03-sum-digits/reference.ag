@@ -1,0 +1,17 @@
+(module SumDigits
+  (defun sum_digits ((n : Num)) : Num
+    (def total : Num 0)
+    (def cur : Num n)
+    (if (= cur 0) (return 0) 0)
+    (while (> cur 0)
+      (do
+        (set total (+ total (math.mod cur 10)))
+        (set cur (math.floor (/ cur 10)))))
+    (return total))
+
+  (test zero   (assert-eq (sum_digits 0) 0))
+  (test single (assert-eq (sum_digits 9) 9))
+  (test two    (assert-eq (sum_digits 23) 5))
+  (test three  (assert-eq (sum_digits 123) 6))
+  (test zeros  (assert-eq (sum_digits 1000) 1))
+  (test big    (assert-eq (sum_digits 99999) 45)))

@@ -1,0 +1,22 @@
+(module LineCount
+  (extern defun file_read ((path : Str)) : Str @capability "file.read")
+
+  (defun line_count ((path : Str)) : Num
+    (def s : Str (file_read path))
+    (def n : Num (str.length s))
+    (if (= n 0) (return 0) 0)
+    (def count : Num 0)
+    (def i : Num 0)
+    (while (< i n)
+      (do
+        (if (str.eq (str.substring s i 1) "\n") (set count (+ count 1)) 0)
+        (set i (+ i 1))))
+    (def last : Str (str.substring s (- n 1) 1))
+    (if (str.eq last "\n") (return count) (return (+ count 1))))
+
+  (test empty          (mocks (file.read "/f" "")) (assert-eq (line_count "/f") 0))
+  (test one_terminated (mocks (file.read "/f" "a\n")) (assert-eq (line_count "/f") 1))
+  (test two_terminated (mocks (file.read "/f" "a\nb\n")) (assert-eq (line_count "/f") 2))
+  (test two_no_final   (mocks (file.read "/f" "a\nb")) (assert-eq (line_count "/f") 2))
+  (test just_newline   (mocks (file.read "/f" "\n")) (assert-eq (line_count "/f") 1))
+  (test double_nl      (mocks (file.read "/f" "\n\n")) (assert-eq (line_count "/f") 2)))

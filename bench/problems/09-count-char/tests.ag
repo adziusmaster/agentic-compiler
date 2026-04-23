@@ -1,0 +1,7 @@
+(test empty     (assert-eq (count_char "" "a") 0))
+(test none      (assert-eq (count_char "banana" "z") 0))
+(test three     (assert-eq (count_char "banana" "a") 3))
+(test case      (assert-eq (count_char "Banana" "a") 3))
+(test case_none (assert-eq (count_char "Banana" "A") 0))
+(test all       (assert-eq (count_char "aaaa" "a") 4))
+(test spaces    (assert-eq (count_char "a b c d" " ") 3))
