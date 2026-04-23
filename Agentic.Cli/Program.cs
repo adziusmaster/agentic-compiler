@@ -49,7 +49,6 @@ switch (command)
     default:
         if (File.Exists(args[0]) && args[0].EndsWith(".ag"))
         {
-            // Legacy: bare file path → auto-detect mode
             string content = File.ReadAllText(args[0]);
             if (content.TrimStart().StartsWith("name:") || content.TrimStart().StartsWith("Name:"))
                 await RunLegacyAgent(args[0]);
@@ -114,10 +113,6 @@ static void RunVerify(string binaryPath)
         return;
     }
 
-    // C6: prefer the sidecar `<binaryPath>.manifest.json` over the embedded
-    // copy. The sidecar carries BinaryHash; the embedded copy does not
-    // (chicken-and-egg). If only the embedded copy is available, we run in
-    // "legacy" mode and skip the binary-hash check with a warning.
     string sidecarPath = Agentic.Core.Runtime.ProofManifestBuilder.SidecarPathFor(binaryPath);
     Agentic.Core.Runtime.ProofManifest manifest;
     string source;
@@ -204,7 +199,6 @@ static void RunCompile(string filePath, bool emitBinary, string outputFormat, Pe
 {
     string outputName = Path.GetFileNameWithoutExtension(filePath);
 
-    // Directory → multi-file project compilation
     if (Directory.Exists(filePath))
     {
         outputName = new DirectoryInfo(filePath).Name;
@@ -254,7 +248,6 @@ static void RunCompile(string filePath, bool emitBinary, string outputFormat, Pe
         Console.WriteLine("----------------------------------");
     }
 
-    // Copy .ag source next to the binary
     if (fileResult.Success && fileResult.BinaryPath is not null)
     {
         var binaryDir = Path.GetDirectoryName(fileResult.BinaryPath)!;
@@ -278,7 +271,6 @@ static IAgentClient? BuildAgentClient()
     if (provider == "gemini" && !string.IsNullOrWhiteSpace(gemini))
         return new AgentClient(gemini);
 
-    // Auto-select by whichever key is present (priority: Anthropic → OpenAI → Gemini).
     if (!string.IsNullOrWhiteSpace(anthropic))
         return new AnthropicClient(anthropic, Environment.GetEnvironmentVariable("ANTHROPIC_MODEL") ?? "claude-sonnet-4-6");
     if (!string.IsNullOrWhiteSpace(openai))
