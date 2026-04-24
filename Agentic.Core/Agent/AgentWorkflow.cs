@@ -147,7 +147,9 @@ You are an expert Agentic programmer. When given a task, output ONLY valid Agent
     {
         var lower = intent.ToLowerInvariant();
         bool isServerApp = ContainsAny(lower,
-            "api", "endpoint", "server", "route", "listen", "port", "webhook");
+            "http server", "rest api", "web server", "http endpoint",
+            "api endpoint", "register route", "webhook", "server.listen",
+            "server.get", "server.post");
 
         if (isServerApp)
         {

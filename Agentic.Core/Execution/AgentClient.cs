@@ -57,6 +57,13 @@ public sealed class AgentClient : IAgentClient
                     .GetProperty("text")
                     .GetString() ?? string.Empty;
 
+                if (doc.RootElement.TryGetProperty("usageMetadata", out var usage))
+                {
+                    int tin = usage.TryGetProperty("promptTokenCount", out var p) ? p.GetInt32() : 0;
+                    int tout = usage.TryGetProperty("candidatesTokenCount", out var c) ? c.GetInt32() : 0;
+                    Console.WriteLine($"[TOKENS in={tin} out={tout}]");
+                }
+
                 return AgentClientHelpers.CleanMarkdown(rawOutput);
             }
 

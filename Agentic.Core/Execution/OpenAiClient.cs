@@ -66,6 +66,13 @@ public sealed class OpenAiClient : IAgentClient
                     .GetProperty("content")
                     .GetString() ?? string.Empty;
 
+                if (doc.RootElement.TryGetProperty("usage", out var usage))
+                {
+                    int tin = usage.TryGetProperty("prompt_tokens", out var p) ? p.GetInt32() : 0;
+                    int tout = usage.TryGetProperty("completion_tokens", out var c) ? c.GetInt32() : 0;
+                    Console.WriteLine($"[TOKENS in={tin} out={tout}]");
+                }
+
                 return AgentClientHelpers.CleanMarkdown(rawOutput);
             }
 

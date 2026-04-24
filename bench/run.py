@@ -112,7 +112,7 @@ def run_agc(prob: Path, meta: dict) -> Result:
     t0 = time.monotonic()
     with tempfile.TemporaryDirectory() as td:
         cmd = [
-            "dotnet", "run", "--project", str(AGC_PROJECT), "--",
+            "dotnet", "run", "--project", str(AGC_PROJECT), "--no-build", "--",
             "agent", prompt, "--out", prob.name.replace("-", "_"),
             "--json",
         ] + perm_flags
@@ -128,9 +128,10 @@ def run_agc(prob: Path, meta: dict) -> Result:
         wall = time.monotonic() - t0
         stdout = proc.stdout + "\n" + proc.stderr
 
-        attempts = max(1, len(re.findall(r"\[ATTEMPT \d+\]", stdout)))
-        tok_in = sum(int(m) for m in re.findall(r"tokens-in[:= ]+(\d+)", stdout, re.I))
-        tok_out = sum(int(m) for m in re.findall(r"tokens-out[:= ]+(\d+)", stdout, re.I))
+        nums = [int(m) for m in re.findall(r"attempt (\d+)/\d+", stdout)]
+        attempts = max(nums) if nums else 1
+        tok_in = sum(int(m) for m in re.findall(r"\[TOKENS in=(\d+)", stdout))
+        tok_out = sum(int(m) for m in re.findall(r"\[TOKENS in=\d+ out=(\d+)\]", stdout))
         passed = bool(re.search(r"\[SUCCESS\]", stdout)) and proc.returncode == 0
 
         src_file = next(Path(td).glob("*.ag"), None)
