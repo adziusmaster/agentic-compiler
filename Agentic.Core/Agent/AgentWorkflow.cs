@@ -116,9 +116,21 @@ public sealed class AgentWorkflow
     }
 
     /// <summary>
-    /// Builds the system prompt: language spec + generation rules.
+    /// Builds the system prompt. Honors env var AGC_PROMPT_MODE ∈ {full, minimal, none}
+    /// so the bench harness can measure pass rate vs prompt budget.
     /// </summary>
     internal static string BuildSystemPrompt()
+    {
+        var mode = Environment.GetEnvironmentVariable("AGC_PROMPT_MODE")?.ToLowerInvariant() ?? "full";
+        return mode switch
+        {
+            "none" => BuildBareSystemPrompt(),
+            "minimal" => BuildMinimalSystemPrompt(),
+            _ => BuildFullSystemPrompt()
+        };
+    }
+
+    private static string BuildFullSystemPrompt()
     {
         return $@"{LanguageSpec.GetSpec()}
 
@@ -138,6 +150,24 @@ You are an expert Agentic programmer. When given a task, output ONLY valid Agent
 10. Tests MUST be self-contained. Do NOT use (sys.input.get …) inside tests — use literal values.
 11. Place (sys.input.get …) calls ONLY in the main execution block AFTER all tests.
 12. If the task involves an HTTP server/API, use server.get/server.post/server.json_get/server.json_post and server.listen. Do NOT read CLI args for server apps — the server handles request routing.";
+    }
+
+    private static string BuildMinimalSystemPrompt()
+    {
+        return @"Output only AGC (Agentic Compiler) S-expression source code. No prose, no markdown.
+
+AGC is a strongly-typed Lisp. Root must be (module Name ...). Types: Num, Str, Bool, (Array T).
+Forms: (defun name ((p : T)...) : T body), (def name : T expr), (if c a b), (while c (do ...)), (return e), (require c), (test name assertions).
+Assertions: (assert-eq a b), (assert-near a b tol).
+Math is binary: (+ a (+ b c)).
+Stdlib prefixes: math.* (pow, floor, sqrt, mod, ...), str.* (eq, split, join, substring, to_num, from_num, lower), arr.* (new, get, set, length).
+Capability FFI: (extern defun name ((p : T)) : T @capability ""cap.name""). In tests use (mocks (cap.name args return)).
+assert-eq compares values (both Num and Str work). str.eq returns Bool.";
+    }
+
+    private static string BuildBareSystemPrompt()
+    {
+        return "Output only AGC (Agentic Compiler) S-expression source code, no prose.";
     }
 
     /// <summary>
