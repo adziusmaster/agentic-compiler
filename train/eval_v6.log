@@ -1,0 +1,174 @@
+============================================
+[iter200-n1] adapter=train/lora_adapter_v6_claude_iter200 n=1 temp=0.0
+out=bench/results/2026-05-05/agc-v6c-iter200-n1.jsonl
+============================================
+Loading mlx-community/Qwen2.5-Coder-3B-Instruct-4bit + adapter train/lora_adapter_v6_claude_iter200...
+Fetching 9 files:   0%|          | 0/9 [00:00<?, ?it/s]Fetching 9 files: 100%|██████████| 9/9 [00:00<00:00, 199728.76it/s]
+Loaded.
+[FAIL] 01-word-count                  N=1 wall=4.4s best=4/7 loc=19
+[PASS] 02-reverse-words               N=1 wall=3.7s best=5/5 loc=18
+[PASS] 03-sum-digits                  N=1 wall=3.3s best=6/6 loc=15
+[FAIL] 04-is-prime                    N=1 wall=5.5s best=5/10 loc=25
+[PASS] 05-gcd                         N=1 wall=3.3s best=7/7 loc=10
+[PASS] 06-fibonacci                   N=1 wall=4.4s best=8/8 loc=20
+[FAIL] 07-balanced-parens             N=1 wall=4.3s best=0/0 loc=0
+[PASS] 08-max-in-array                N=1 wall=6.4s best=4/4 loc=27
+[FAIL] 09-count-char                  N=1 wall=4.0s best=0/0 loc=0
+[PASS] 10-reverse-string              N=1 wall=3.3s best=6/6 loc=15
+[PASS] 11-env-or-default              N=1 wall=2.6s best=2/2 loc=8
+[PASS] 12-file-first-line             N=1 wall=3.4s best=3/3 loc=10
+[FAIL] 13-env-int-or                  N=1 wall=3.3s best=0/0 loc=0
+[FAIL] 14-file-write-status           N=1 wall=3.0s best=0/0 loc=0
+[PASS] 15-http-body-length            N=1 wall=3.1s best=3/3 loc=8
+[PASS] 16-env-join-two                N=1 wall=4.8s best=4/4 loc=12
+[FAIL] 17-file-line-count             N=1 wall=5.3s best=5/6 loc=18
+[PASS] 18-db-scalar-count             N=1 wall=3.3s best=3/3 loc=8
+[FAIL] 19-env-bool-enabled            N=1 wall=5.7s best=5/8 loc=17
+[PASS] 20-file-copy                   N=1 wall=4.5s best=3/3 loc=21
+[FAIL] 21-invoice-total               N=1 wall=6.1s best=0/0 loc=0
+[FAIL] 22-paycheck-net                N=1 wall=5.3s best=2/4 loc=16
+[FAIL] 23-rental-cost                 N=1 wall=7.3s best=0/0 loc=0
+[FAIL] 24-tip-split                   N=1 wall=4.7s best=0/0 loc=0
+[PASS] 25-loan-payment                N=1 wall=4.6s best=4/4 loc=13
+[FAIL] 26-tax-progressive             N=1 wall=4.6s best=0/0 loc=0
+[FAIL] 27-bmi-category                N=1 wall=3.8s best=1/5 loc=13
+[FAIL] 28-shipping-cost               N=1 wall=5.9s best=5/6 loc=20
+[PASS] 29-compound-interest           N=1 wall=4.5s best=5/5 loc=12
+[PASS] 30-grade-average               N=1 wall=6.2s best=7/7 loc=25
+
+=== SUMMARY ===
+pass: 15/30 (50%)
+total wall: 134s
+results: bench/results/2026-05-05/agc-v6c-iter200-n1.jsonl
+============================================
+[iter200-n8] adapter=train/lora_adapter_v6_claude_iter200 n=8 temp=0.7
+out=bench/results/2026-05-05/agc-v6c-iter200-n8.jsonl
+============================================
+Loading mlx-community/Qwen2.5-Coder-3B-Instruct-4bit + adapter train/lora_adapter_v6_claude_iter200...
+Fetching 9 files:   0%|          | 0/9 [00:00<?, ?it/s]Fetching 9 files: 100%|██████████| 9/9 [00:00<00:00, 208556.55it/s]
+Loaded.
+[FAIL] 01-word-count                  N=8 wall=30.4s best=4/7 loc=19
+[PASS] 02-reverse-words               N=8 wall=25.4s best=5/5 loc=17
+[PASS] 03-sum-digits                  N=8 wall=23.1s best=6/6 loc=15
+[PASS] 04-is-prime                    N=8 wall=37.6s best=10/10 loc=25
+[PASS] 05-gcd                         N=8 wall=24.0s best=7/7 loc=10
+[PASS] 06-fibonacci                   N=8 wall=31.8s best=8/8 loc=10
+[FAIL] 07-balanced-parens             N=8 wall=56.4s best=0/0 loc=0
+[PASS] 08-max-in-array                N=8 wall=48.7s best=4/4 loc=27
+[FAIL] 09-count-char                  N=8 wall=32.3s best=2/7 loc=17
+[PASS] 10-reverse-string              N=8 wall=24.5s best=6/6 loc=16
+[PASS] 11-env-or-default              N=8 wall=16.5s best=2/2 loc=12
+[PASS] 12-file-first-line             N=8 wall=23.5s best=3/3 loc=10
+[PASS] 13-env-int-or                  N=8 wall=22.1s best=3/3 loc=15
+[PASS] 14-file-write-status           N=8 wall=18.7s best=2/2 loc=6
+[PASS] 15-http-body-length            N=8 wall=20.5s best=3/3 loc=8
+[PASS] 16-env-join-two                N=8 wall=34.1s best=4/4 loc=12
+[FAIL] 17-file-line-count             N=8 wall=41.4s best=5/6 loc=20
+[PASS] 18-db-scalar-count             N=8 wall=22.5s best=3/3 loc=7
+[PASS] 19-env-bool-enabled            N=8 wall=42.6s best=5/5 loc=16
+[FAIL] 20-file-copy                   N=8 wall=30.5s best=1/2 loc=9
+[FAIL] 21-invoice-total               N=8 wall=43.7s best=0/0 loc=0
+[FAIL] 22-paycheck-net                N=8 wall=43.0s best=2/4 loc=22
+[FAIL] 23-rental-cost                 N=8 wall=53.1s best=0/0 loc=0
+[FAIL] 24-tip-split                   N=8 wall=40.0s best=1/5 loc=10
+[PASS] 25-loan-payment                N=8 wall=29.7s best=1/1 loc=10
+[FAIL] 26-tax-progressive             N=8 wall=37.5s best=0/0 loc=0
+[PASS] 27-bmi-category                N=8 wall=26.4s best=5/5 loc=13
+[PASS] 28-shipping-cost               N=8 wall=38.0s best=6/6 loc=15
+[PASS] 29-compound-interest           N=8 wall=33.2s best=4/4 loc=11
+[PASS] 30-grade-average               N=8 wall=49.1s best=7/7 loc=25
+
+=== SUMMARY ===
+pass: 20/30 (67%)
+total wall: 1000s
+results: bench/results/2026-05-05/agc-v6c-iter200-n8.jsonl
+============================================
+[final-n1] adapter=train/lora_adapter_v6_claude n=1 temp=0.0
+out=bench/results/2026-05-05/agc-v6c-final-n1.jsonl
+============================================
+Loading mlx-community/Qwen2.5-Coder-3B-Instruct-4bit + adapter train/lora_adapter_v6_claude...
+Fetching 9 files:   0%|          | 0/9 [00:00<?, ?it/s]Fetching 9 files: 100%|██████████| 9/9 [00:00<00:00, 111025.69it/s]
+Loaded.
+[FAIL] 01-word-count                  N=1 wall=4.0s best=1/7 loc=19
+[PASS] 02-reverse-words               N=1 wall=3.6s best=5/5 loc=18
+[PASS] 03-sum-digits                  N=1 wall=3.4s best=6/6 loc=15
+[PASS] 04-is-prime                    N=1 wall=4.9s best=10/10 loc=22
+[PASS] 05-gcd                         N=1 wall=3.4s best=7/7 loc=11
+[PASS] 06-fibonacci                   N=1 wall=4.1s best=8/8 loc=20
+[PASS] 07-balanced-parens             N=1 wall=4.8s best=9/9 loc=21
+[PASS] 08-max-in-array                N=1 wall=6.4s best=4/4 loc=28
+[PASS] 09-count-char                  N=1 wall=4.0s best=7/7 loc=16
+[PASS] 10-reverse-string              N=1 wall=3.3s best=6/6 loc=15
+[PASS] 11-env-or-default              N=1 wall=2.7s best=2/2 loc=8
+[PASS] 12-file-first-line             N=1 wall=3.6s best=3/3 loc=16
+[FAIL] 13-env-int-or                  N=1 wall=2.6s best=0/0 loc=0
+[FAIL] 14-file-write-status           N=1 wall=3.1s best=0/0 loc=0
+[PASS] 15-http-body-length            N=1 wall=3.3s best=3/3 loc=14
+[PASS] 16-env-join-two                N=1 wall=4.9s best=4/4 loc=12
+[FAIL] 17-file-line-count             N=1 wall=4.8s best=0/0 loc=0
+[PASS] 18-db-scalar-count             N=1 wall=3.2s best=3/3 loc=7
+[PASS] 19-env-bool-enabled            N=1 wall=5.7s best=8/8 loc=17
+[FAIL] 20-file-copy                   N=1 wall=3.6s best=0/0 loc=0
+[FAIL] 21-invoice-total               N=1 wall=5.7s best=0/0 loc=0
+[FAIL] 22-paycheck-net                N=1 wall=5.0s best=0/0 loc=0
+[FAIL] 23-rental-cost                 N=1 wall=7.0s best=0/0 loc=0
+[PASS] 24-tip-split                   N=1 wall=4.4s best=5/5 loc=10
+[PASS] 25-loan-payment                N=1 wall=4.1s best=4/4 loc=11
+[FAIL] 26-tax-progressive             N=1 wall=4.7s best=0/0 loc=0
+[PASS] 27-bmi-category                N=1 wall=3.6s best=5/5 loc=13
+[FAIL] 28-shipping-cost               N=1 wall=5.2s best=0/0 loc=0
+[PASS] 29-compound-interest           N=1 wall=4.4s best=3/3 loc=16
+[FAIL] 30-grade-average               N=1 wall=6.6s best=0/0 loc=0
+
+=== SUMMARY ===
+pass: 19/30 (63%)
+total wall: 130s
+results: bench/results/2026-05-05/agc-v6c-final-n1.jsonl
+============================================
+[final-n8] adapter=train/lora_adapter_v6_claude n=8 temp=0.7
+out=bench/results/2026-05-05/agc-v6c-final-n8.jsonl
+============================================
+Loading mlx-community/Qwen2.5-Coder-3B-Instruct-4bit + adapter train/lora_adapter_v6_claude...
+Fetching 9 files:   0%|          | 0/9 [00:00<?, ?it/s]Fetching 9 files: 100%|██████████| 9/9 [00:00<00:00, 173159.34it/s]
+Loaded.
+[FAIL] 01-word-count                  N=8 wall=49.4s best=3/7 loc=21
+[PASS] 02-reverse-words               N=8 wall=25.2s best=5/5 loc=18
+[PASS] 03-sum-digits                  N=8 wall=23.4s best=6/6 loc=15
+[PASS] 04-is-prime                    N=8 wall=35.5s best=10/10 loc=22
+[PASS] 05-gcd                         N=8 wall=22.6s best=7/7 loc=11
+[PASS] 06-fibonacci                   N=8 wall=29.5s best=8/8 loc=20
+[FAIL] 07-balanced-parens             N=8 wall=38.2s best=5/9 loc=21
+[PASS] 08-max-in-array                N=8 wall=42.3s best=4/4 loc=28
+[PASS] 09-count-char                  N=8 wall=28.4s best=7/7 loc=16
+[PASS] 10-reverse-string              N=8 wall=23.3s best=6/6 loc=15
+[PASS] 11-env-or-default              N=8 wall=17.4s best=2/2 loc=8
+[PASS] 12-file-first-line             N=8 wall=25.7s best=3/3 loc=16
+[FAIL] 13-env-int-or                  N=8 wall=22.3s best=0/0 loc=0
+[FAIL] 14-file-write-status           N=8 wall=22.6s best=0/0 loc=0
+[PASS] 15-http-body-length            N=8 wall=20.9s best=3/3 loc=9
+[PASS] 16-env-join-two                N=8 wall=33.4s best=4/4 loc=12
+[FAIL] 17-file-line-count             N=8 wall=38.1s best=2/6 loc=13
+[PASS] 18-db-scalar-count             N=8 wall=21.7s best=3/3 loc=7
+[PASS] 19-env-bool-enabled            N=8 wall=41.5s best=8/8 loc=16
+[FAIL] 20-file-copy                   N=8 wall=26.6s best=0/0 loc=0
+[FAIL] 21-invoice-total               N=8 wall=42.7s best=3/6 loc=16
+[FAIL] 22-paycheck-net                N=8 wall=42.2s best=1/4 loc=13
+[FAIL] 23-rental-cost                 N=8 wall=52.9s best=0/0 loc=0
+[PASS] 24-tip-split                   N=8 wall=34.2s best=5/5 loc=10
+[PASS] 25-loan-payment                N=8 wall=29.8s best=4/4 loc=11
+[FAIL] 26-tax-progressive             N=8 wall=38.7s best=0/0 loc=0
+[PASS] 27-bmi-category                N=8 wall=25.4s best=5/5 loc=13
+[FAIL] 28-shipping-cost               N=8 wall=43.1s best=4/6 loc=15
+[PASS] 29-compound-interest           N=8 wall=38.3s best=3/3 loc=18
+[PASS] 30-grade-average               N=8 wall=48.1s best=7/7 loc=26
+
+=== SUMMARY ===
+pass: 19/30 (63%)
+total wall: 983s
+results: bench/results/2026-05-05/agc-v6c-final-n8.jsonl
+============================================
+ALL DONE
+-rw-r--r--  1 andrzej.lech  staff   9445 May  5 12:13 bench/results/2026-05-05/agc-v6c-final-n1.jsonl
+-rw-r--r--  1 andrzej.lech  staff  11084 May  5 12:29 bench/results/2026-05-05/agc-v6c-final-n8.jsonl
+-rw-r--r--  1 andrzej.lech  staff  11355 May  5 11:54 bench/results/2026-05-05/agc-v6c-iter200-n1.jsonl
+-rw-r--r--  1 andrzej.lech  staff  11085 May  5 12:11 bench/results/2026-05-05/agc-v6c-iter200-n8.jsonl

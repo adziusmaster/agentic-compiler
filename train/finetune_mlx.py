@@ -23,9 +23,9 @@ import sys
 from pathlib import Path
 
 TRAIN_DIR = Path(__file__).resolve().parent
-DATASET_PATH = TRAIN_DIR / "dataset" / "agc_pairs.jsonl"
+DEFAULT_DATASET = TRAIN_DIR / "dataset" / "agc_pairs.jsonl"
 CHAT_DIR = TRAIN_DIR / "mlx_chat"
-ADAPTER_DIR = TRAIN_DIR / "lora_adapter"
+DEFAULT_ADAPTER_DIR = TRAIN_DIR / "lora_adapter"
 
 # Minimal system prompt the fine-tuned model should respond to at inference.
 # Purpose: the model learns to generate AGC given ONLY this short prefix.
@@ -48,8 +48,8 @@ def to_chat(rec: dict) -> dict:
     }
 
 
-def split_dataset(seed: int = 42, valid_frac: float = 0.1) -> tuple[int, int]:
-    pairs = [json.loads(l) for l in DATASET_PATH.read_text().splitlines() if l.strip()]
+def split_dataset(dataset_path: Path, seed: int = 42, valid_frac: float = 0.1) -> tuple[int, int]:
+    pairs = [json.loads(l) for l in dataset_path.read_text().splitlines() if l.strip()]
     random.Random(seed).shuffle(pairs)
     n_valid = max(10, int(len(pairs) * valid_frac))
     valid, train = pairs[:n_valid], pairs[n_valid:]
@@ -61,8 +61,8 @@ def split_dataset(seed: int = 42, valid_frac: float = 0.1) -> tuple[int, int]:
     return len(train), len(valid)
 
 
-def run_lora(model: str, epochs: int, batch_size: int, lora_layers: int) -> int:
-    # iters per epoch = train_examples / batch_size; default 112 fits ~450 train@4.
+def run_lora(model: str, epochs: int, batch_size: int, lora_layers: int,
+             adapter_dir: Path, max_seq_length: int) -> int:
     train_path = CHAT_DIR / "train.jsonl"
     n_train = sum(1 for _ in train_path.open()) if train_path.exists() else 450
     iters_per_epoch = max(1, n_train // batch_size)
@@ -73,7 +73,7 @@ def run_lora(model: str, epochs: int, batch_size: int, lora_layers: int) -> int:
         "--model", model,
         "--train",
         "--data", str(CHAT_DIR),
-        "--adapter-path", str(ADAPTER_DIR),
+        "--adapter-path", str(adapter_dir),
         "--num-layers", str(lora_layers),
         "--batch-size", str(batch_size),
         "--iters", str(iters),
@@ -82,7 +82,7 @@ def run_lora(model: str, epochs: int, batch_size: int, lora_layers: int) -> int:
         "--steps-per-report", "25",
         "--learning-rate", "1e-4",
         "--mask-prompt",       # only compute loss on assistant output
-        "--max-seq-length", "2048",
+        "--max-seq-length", str(max_seq_length),
     ]
     print("Launching:", " ".join(cmd))
     return subprocess.run(cmd).returncode
@@ -96,19 +96,25 @@ def main():
     ap.add_argument("--batch-size", type=int, default=4)
     ap.add_argument("--lora-layers", type=int, default=16,
                     help="number of transformer layers to apply LoRA to")
+    ap.add_argument("--data", type=Path, default=DEFAULT_DATASET,
+                    help="path to a JSONL dataset (objective+solution rows)")
+    ap.add_argument("--adapter-path", type=Path, default=DEFAULT_ADAPTER_DIR,
+                    help="where to write the LoRA adapter")
+    ap.add_argument("--max-seq-length", type=int, default=2048)
     ap.add_argument("--skip-split", action="store_true")
     args = ap.parse_args()
 
-    if not DATASET_PATH.exists():
-        print(f"Dataset missing: {DATASET_PATH}. Run generate_dataset.py first.")
+    if not args.data.exists():
+        print(f"Dataset missing: {args.data}. Run generate_dataset.py first.")
         return 1
 
     if not args.skip_split:
-        n_train, n_valid = split_dataset()
-        print(f"Split: {n_train} train, {n_valid} valid")
+        n_train, n_valid = split_dataset(args.data)
+        print(f"Split: {n_train} train, {n_valid} valid (from {args.data.name})")
 
-    ADAPTER_DIR.mkdir(parents=True, exist_ok=True)
-    return run_lora(args.model, args.epochs, args.batch_size, args.lora_layers)
+    args.adapter_path.mkdir(parents=True, exist_ok=True)
+    return run_lora(args.model, args.epochs, args.batch_size, args.lora_layers,
+                    args.adapter_path, args.max_seq_length)
 
 
 if __name__ == "__main__":
