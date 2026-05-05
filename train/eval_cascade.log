@@ -1,48 +1,0 @@
-Loading [v6_claude] from train/lora_adapter_v6_claude...
-Fetching 9 files:   0%|          | 0/9 [00:00<?, ?it/s]Fetching 9 files: 100%|██████████| 9/9 [00:00<00:00, 196608.00it/s]
-Loading [v7_claude] from train/lora_adapter_v7_claude...
-Fetching 9 files:   0%|          | 0/9 [00:00<?, ?it/s]Fetching 9 files: 100%|██████████| 9/9 [00:00<00:00, 66811.92it/s]
-Loading [v8_claude] from train/lora_adapter_v8_claude...
-Fetching 9 files:   0%|          | 0/9 [00:00<?, ?it/s]Fetching 9 files: 100%|██████████| 9/9 [00:00<00:00, 55188.21it/s]
-Loaded 3 adapters.
-[PASS] 01-word-count                  stage=sample-v8_claude   samples=14 wall=61.1s toks=7391 tests=7/7
-[PASS] 02-reverse-words               stage=greedy-v6_claude   samples=1 wall=3.7s toks=451 tests=5/5
-[PASS] 03-sum-digits                  stage=greedy-v6_claude   samples=1 wall=3.5s toks=459 tests=6/6
-[PASS] 04-is-prime                    stage=greedy-v6_claude   samples=1 wall=5.0s toks=646 tests=10/10
-[PASS] 05-gcd                         stage=greedy-v6_claude   samples=1 wall=3.4s toks=498 tests=7/7
-[PASS] 06-fibonacci                   stage=greedy-v6_claude   samples=1 wall=4.2s toks=550 tests=8/8
-[PASS] 07-balanced-parens             stage=greedy-v6_claude   samples=1 wall=5.0s toks=656 tests=9/9
-[PASS] 08-max-in-array                stage=greedy-v6_claude   samples=1 wall=6.5s toks=932 tests=4/4
-[PASS] 09-count-char                  stage=greedy-v6_claude   samples=1 wall=4.0s toks=552 tests=7/7
-[PASS] 10-reverse-string              stage=greedy-v6_claude   samples=1 wall=3.3s toks=442 tests=6/6
-[PASS] 11-env-or-default              stage=greedy-v6_claude   samples=1 wall=2.6s toks=407 tests=2/2
-[PASS] 12-file-first-line             stage=greedy-v6_claude   samples=1 wall=3.6s toks=505 tests=3/3
-[PASS] 13-env-int-or                  stage=greedy-v7_claude   samples=2 wall=6.0s toks=1011 tests=3/3
-[PASS] 14-file-write-status           stage=greedy-v7_claude   samples=2 wall=6.1s toks=919 tests=2/2
-[PASS] 15-http-body-length            stage=greedy-v6_claude   samples=1 wall=3.4s toks=472 tests=3/3
-[PASS] 16-env-join-two                stage=greedy-v6_claude   samples=1 wall=4.8s toks=657 tests=4/4
-[PASS] 17-file-line-count             stage=sample-v8_claude   samples=12 wall=62.5s toks=8732 tests=6/6
-[PASS] 18-db-scalar-count             stage=greedy-v6_claude   samples=1 wall=3.3s toks=487 tests=3/3
-[PASS] 19-env-bool-enabled            stage=greedy-v6_claude   samples=1 wall=5.7s toks=794 tests=8/8
-[PASS] 20-file-copy                   stage=greedy-v7_claude   samples=2 wall=8.2s toks=1292 tests=3/3
-[PASS] 21-invoice-total               stage=greedy-v8_claude   samples=3 wall=16.9s toks=2440 tests=6/6
-[PASS] 22-paycheck-net                stage=sample-v8_claude   samples=13 wall=93.9s toks=11100 tests=4/4
-[FAIL] 23-rental-cost                 stage=exhausted          samples=15 wall=108.5s toks=13850 tests=1/6
-[PASS] 24-tip-split                   stage=greedy-v6_claude   samples=1 wall=4.5s toks=644 tests=5/5
-[PASS] 25-loan-payment                stage=greedy-v6_claude   samples=1 wall=4.2s toks=601 tests=4/4
-[FAIL] 26-tax-progressive             stage=exhausted          samples=15 wall=80.6s toks=11546 tests=0/0
-[PASS] 27-bmi-category                stage=greedy-v6_claude   samples=1 wall=3.7s toks=520 tests=5/5
-[PASS] 28-shipping-cost               stage=sample-v8_claude   samples=14 wall=75.4s toks=10100 tests=6/6
-[PASS] 29-compound-interest           stage=greedy-v6_claude   samples=1 wall=4.5s toks=628 tests=3/3
-[PASS] 30-grade-average               stage=sample-v6_claude   samples=4 wall=27.7s toks=3391 tests=7/7
-
-=== SUMMARY ===
-pass: 28/30 (93%)
-wall: 626s
-  greedy-v6_claude: 19
-  greedy-v7_claude: 3
-  greedy-v8_claude: 1
-  sample-v6_claude: 1
-  sample-v8_claude: 4
-total tokens: 82673, tokens/pass: 2952
-results: bench/results/2026-05-05/agc-cascade-v6v7v8.jsonl

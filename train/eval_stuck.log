@@ -1,7 +1,0 @@
-Loading mlx-community/Qwen2.5-Coder-3B-Instruct-4bit + adapter train/lora_adapter_v7_claude...
-Fetching 9 files:   0%|          | 0/9 [00:00<?, ?it/s]Fetching 9 files: 100%|██████████| 9/9 [00:00<00:00, 184140.18it/s]
-Loaded.
-[FAIL] 01-word-count                  N=32 wall=151.6s best=6/7 loc=19
-[FAIL] 17-file-line-count             N=32 wall=179.5s best=5/6 loc=17
-/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/multiprocessing/resource_tracker.py:396: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown: {'/mp-bvxc14rs'}
-  warnings.warn(

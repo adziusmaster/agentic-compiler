@@ -1,44 +1,0 @@
-Loading primary train/lora_adapter_v6_claude...
-Fetching 9 files:   0%|          | 0/9 [00:00<?, ?it/s]Fetching 9 files: 100%|██████████| 9/9 [00:00<00:00, 195589.31it/s]
-Loading fallback train/lora_adapter_v7_claude...
-Fetching 9 files:   0%|          | 0/9 [00:00<?, ?it/s]Fetching 9 files: 100%|██████████| 9/9 [00:00<00:00, 45208.07it/s]
-Both loaded.
-[FAIL] 01-word-count                  stage=fallback-sample    samples=10 wall=45.6s toks=5281 tests=2/7
-[PASS] 02-reverse-words               stage=primary-greedy     samples=1 wall=3.6s toks=451 tests=5/5
-[PASS] 03-sum-digits                  stage=primary-greedy     samples=1 wall=3.6s toks=459 tests=6/6
-[PASS] 04-is-prime                    stage=primary-greedy     samples=1 wall=5.1s toks=646 tests=10/10
-[PASS] 05-gcd                         stage=primary-greedy     samples=1 wall=3.4s toks=498 tests=7/7
-[PASS] 06-fibonacci                   stage=primary-greedy     samples=1 wall=4.2s toks=550 tests=8/8
-[PASS] 07-balanced-parens             stage=primary-greedy     samples=1 wall=4.9s toks=656 tests=9/9
-[PASS] 08-max-in-array                stage=primary-greedy     samples=1 wall=6.6s toks=932 tests=4/4
-[PASS] 09-count-char                  stage=primary-greedy     samples=1 wall=4.1s toks=552 tests=7/7
-[PASS] 10-reverse-string              stage=primary-greedy     samples=1 wall=3.4s toks=442 tests=6/6
-[PASS] 11-env-or-default              stage=primary-greedy     samples=1 wall=2.6s toks=407 tests=2/2
-[PASS] 12-file-first-line             stage=primary-greedy     samples=1 wall=3.7s toks=505 tests=3/3
-[PASS] 13-env-int-or                  stage=fallback-greedy    samples=2 wall=6.2s toks=1011 tests=3/3
-[PASS] 14-file-write-status           stage=fallback-greedy    samples=2 wall=6.1s toks=919 tests=2/2
-[PASS] 15-http-body-length            stage=primary-greedy     samples=1 wall=3.3s toks=472 tests=3/3
-[PASS] 16-env-join-two                stage=primary-greedy     samples=1 wall=4.8s toks=657 tests=4/4
-[FAIL] 17-file-line-count             stage=fallback-sample    samples=10 wall=55.1s toks=7406 tests=5/6
-[PASS] 18-db-scalar-count             stage=primary-greedy     samples=1 wall=3.3s toks=487 tests=3/3
-[PASS] 19-env-bool-enabled            stage=primary-greedy     samples=1 wall=5.7s toks=794 tests=8/8
-[PASS] 20-file-copy                   stage=fallback-greedy    samples=2 wall=8.2s toks=1292 tests=3/3
-[PASS] 21-invoice-total               stage=fallback-sample    samples=3 wall=16.7s toks=2356 tests=4/4
-[FAIL] 22-paycheck-net                stage=fallback-sample    samples=10 wall=55.4s toks=7196 tests=2/4
-[FAIL] 23-rental-cost                 stage=fallback-sample    samples=10 wall=66.1s toks=8542 tests=1/6
-[PASS] 24-tip-split                   stage=primary-greedy     samples=1 wall=4.6s toks=644 tests=5/5
-[PASS] 25-loan-payment                stage=primary-greedy     samples=1 wall=4.2s toks=601 tests=4/4
-[FAIL] 26-tax-progressive             stage=fallback-sample    samples=10 wall=58.4s toks=7893 tests=0/6
-[PASS] 27-bmi-category                stage=primary-greedy     samples=1 wall=3.7s toks=520 tests=5/5
-[FAIL] 28-shipping-cost               stage=fallback-sample    samples=10 wall=51.8s toks=6969 tests=0/6
-[PASS] 29-compound-interest           stage=primary-greedy     samples=1 wall=4.6s toks=628 tests=3/3
-[PASS] 30-grade-average               stage=fallback-sample    samples=7 wall=48.1s toks=5828 tests=7/7
-
-=== SUMMARY ===
-pass: 24/30 (80%)
-wall: 497s
-  passes via primary-greedy: 19
-  passes via fallback-greedy: 3
-  passes via fallback-sample: 2
-total tokens: 65594, tokens/pass: 2733
-results: bench/results/2026-05-05/agc-ensemble.jsonl
