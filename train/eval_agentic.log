@@ -1,0 +1,88 @@
+=== v6c-final + agentic (5 attempts) ===
+Loading mlx-community/Qwen2.5-Coder-3B-Instruct-4bit + adapter train/lora_adapter_v6_claude...
+Fetching 9 files:   0%|          | 0/9 [00:00<?, ?it/s]Fetching 9 files: 100%|██████████| 9/9 [00:00<00:00, 173159.34it/s]
+Loaded.
+[FAIL] 01-word-count                  att=5 wall=22.0s toks=4026 tests=1/7 loc=19
+[PASS] 02-reverse-words               att=1 wall=3.6s toks=451 tests=5/5 loc=18
+[PASS] 03-sum-digits                  att=1 wall=3.5s toks=459 tests=6/6 loc=15
+[PASS] 04-is-prime                    att=1 wall=4.9s toks=646 tests=10/10 loc=22
+[PASS] 05-gcd                         att=1 wall=3.4s toks=498 tests=7/7 loc=11
+[PASS] 06-fibonacci                   att=1 wall=4.2s toks=550 tests=8/8 loc=20
+[PASS] 07-balanced-parens             att=1 wall=5.0s toks=656 tests=9/9 loc=21
+[PASS] 08-max-in-array                att=1 wall=6.5s toks=932 tests=4/4 loc=28
+[PASS] 09-count-char                  att=1 wall=4.0s toks=552 tests=7/7 loc=16
+[PASS] 10-reverse-string              att=1 wall=3.4s toks=442 tests=6/6 loc=15
+[PASS] 11-env-or-default              att=1 wall=2.6s toks=407 tests=2/2 loc=8
+[PASS] 12-file-first-line             att=1 wall=3.6s toks=505 tests=3/3 loc=16
+[FAIL] 13-env-int-or                  att=5 wall=16.2s toks=3196 tests=0/3 loc=9
+[FAIL] 14-file-write-status           att=5 wall=16.9s toks=3514 tests=0/2 loc=11
+[PASS] 15-http-body-length            att=1 wall=3.3s toks=472 tests=3/3 loc=14
+[PASS] 16-env-join-two                att=1 wall=4.9s toks=657 tests=4/4 loc=12
+[FAIL] 17-file-line-count             att=5 wall=25.7s toks=5154 tests=0/6 loc=13
+[PASS] 18-db-scalar-count             att=1 wall=3.3s toks=487 tests=3/3 loc=7
+[PASS] 19-env-bool-enabled            att=1 wall=5.7s toks=794 tests=8/8 loc=17
+[FAIL] 20-file-copy                   att=5 wall=20.2s toks=4472 tests=0/3 loc=10
+[FAIL] 21-invoice-total               att=5 wall=31.8s toks=6133 tests=0/6 loc=19
+[FAIL] 22-paycheck-net                att=5 wall=29.3s toks=5145 tests=2/4 loc=16
+[FAIL] 23-rental-cost                 att=5 wall=39.1s toks=6885 tests=0/6 loc=28
+[PASS] 24-tip-split                   att=1 wall=4.4s toks=644 tests=5/5 loc=10
+[PASS] 25-loan-payment                att=1 wall=4.2s toks=601 tests=4/4 loc=11
+[FAIL] 26-tax-progressive             att=5 wall=26.1s toks=5298 tests=0/6 loc=12
+[PASS] 27-bmi-category                att=1 wall=3.7s toks=520 tests=5/5 loc=13
+[FAIL] 28-shipping-cost               att=5 wall=29.6s toks=5512 tests=4/6 loc=19
+[PASS] 29-compound-interest           att=1 wall=4.5s toks=628 tests=3/3 loc=16
+[FAIL] 30-grade-average               att=5 wall=36.4s toks=6339 tests=0/7 loc=24
+
+=== SUMMARY ===
+pass: 19/30 (63%)
+total wall: 372s
+  one-shot passes: 19, tokens=10901 (median per pass: 550)
+  retry passes: 0, tokens=0
+  failed: 11, tokens burned=55674
+  TOTAL tokens: 66575, tokens/pass: 3503
+results: bench/results/2026-05-05/agc-v6c-agentic-r5.jsonl
+
+=== v7c-final + agentic (5 attempts) ===
+Loading mlx-community/Qwen2.5-Coder-3B-Instruct-4bit + adapter train/lora_adapter_v7_claude...
+Fetching 9 files:   0%|          | 0/9 [00:00<?, ?it/s]Fetching 9 files: 100%|██████████| 9/9 [00:00<00:00, 194581.11it/s]
+Loaded.
+[FAIL] 01-word-count                  att=5 wall=24.1s toks=4304 tests=2/7 loc=21
+[FAIL] 02-reverse-words               att=5 wall=19.0s toks=3482 tests=1/5 loc=16
+[PASS] 03-sum-digits                  att=1 wall=3.4s toks=449 tests=6/6 loc=14
+[PASS] 04-is-prime                    att=1 wall=6.2s toks=737 tests=10/10 loc=30
+[PASS] 05-gcd                         att=1 wall=3.8s toks=523 tests=7/7 loc=16
+[FAIL] 06-fibonacci                   att=5 wall=23.5s toks=4503 tests=2/8 loc=18
+[PASS] 07-balanced-parens             att=4 wall=19.3s toks=3119 tests=9/9 loc=27
+[PASS] 08-max-in-array                att=1 wall=6.6s toks=943 tests=4/4 loc=32
+[PASS] 09-count-char                  att=1 wall=4.0s toks=545 tests=7/7 loc=16
+[FAIL] 10-reverse-string              att=5 wall=18.2s toks=3326 tests=0/0 loc=9
+[PASS] 11-env-or-default              att=1 wall=2.7s toks=416 tests=2/2 loc=12
+[FAIL] 12-file-first-line             att=5 wall=18.5s toks=3632 tests=0/0 loc=7
+[PASS] 13-env-int-or                  att=1 wall=3.4s toks=512 tests=3/3 loc=15
+[PASS] 14-file-write-status           att=1 wall=3.0s toks=457 tests=2/2 loc=11
+[PASS] 15-http-body-length            att=1 wall=3.1s toks=454 tests=3/3 loc=7
+[PASS] 16-env-join-two                att=1 wall=4.8s toks=659 tests=4/4 loc=12
+[FAIL] 17-file-line-count             att=5 wall=30.3s toks=5591 tests=2/6 loc=20
+[PASS] 18-db-scalar-count             att=1 wall=3.3s toks=491 tests=3/3 loc=7
+[PASS] 19-env-bool-enabled            att=1 wall=5.9s toks=818 tests=8/8 loc=19
+[PASS] 20-file-copy                   att=1 wall=4.5s toks=676 tests=3/3 loc=20
+[FAIL] 21-invoice-total               att=5 wall=30.8s toks=4831 tests=0/0 loc=7
+[FAIL] 22-paycheck-net                att=5 wall=31.3s toks=5601 tests=0/4 loc=22
+[FAIL] 23-rental-cost                 att=5 wall=33.6s toks=6053 tests=0/6 loc=18
+[FAIL] 24-tip-split                   att=5 wall=16.9s toks=3599 tests=0/0 loc=6
+[PASS] 25-loan-payment                att=1 wall=4.3s toks=616 tests=4/4 loc=14
+[FAIL] 26-tax-progressive             att=5 wall=34.0s toks=6281 tests=0/6 loc=22
+[PASS] 27-bmi-category                att=1 wall=3.7s toks=520 tests=5/5 loc=13
+[FAIL] 28-shipping-cost               att=5 wall=27.3s toks=5165 tests=5/6 loc=15
+[PASS] 29-compound-interest           att=1 wall=4.7s toks=647 tests=5/5 loc=12
+[PASS] 30-grade-average               att=2 wall=14.1s toks=2216 tests=7/7 loc=25
+
+=== SUMMARY ===
+pass: 18/30 (60%)
+total wall: 408s
+  one-shot passes: 16, tokens=9463 (median per pass: 545)
+  retry passes: 2, tokens=5335
+  failed: 12, tokens burned=56368
+  TOTAL tokens: 71166, tokens/pass: 3953
+results: bench/results/2026-05-05/agc-v7c-agentic-r5.jsonl
+ALL DONE
