@@ -62,10 +62,12 @@ def split_dataset(seed: int = 42, valid_frac: float = 0.1) -> tuple[int, int]:
 
 
 def run_lora(model: str, epochs: int, batch_size: int, lora_layers: int) -> int:
-    # Compute iterations ≈ epochs * (train_size / batch_size)
-    # Good practice: let the CLI derive iters from --iters or just pass a number.
-    # Iters: with 450 train / batch 4 = ~112 iters/epoch. 3 epochs = ~336 iters.
-    iters = epochs * 112
+    # iters per epoch = train_examples / batch_size; default 112 fits ~450 train@4.
+    train_path = CHAT_DIR / "train.jsonl"
+    n_train = sum(1 for _ in train_path.open()) if train_path.exists() else 450
+    iters_per_epoch = max(1, n_train // batch_size)
+    iters = epochs * iters_per_epoch
+    print(f"  train_examples={n_train} batch={batch_size} iters/epoch={iters_per_epoch} total_iters={iters}")
     cmd = [
         sys.executable, "-m", "mlx_lm", "lora",
         "--model", model,
@@ -89,7 +91,7 @@ def run_lora(model: str, epochs: int, batch_size: int, lora_layers: int) -> int:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model",
-                    default="mlx-community/Qwen2.5-Coder-1.5B-Instruct-4bit")
+                    default="mlx-community/Qwen2.5-Coder-3B-Instruct-4bit")
     ap.add_argument("--epochs", type=int, default=3)
     ap.add_argument("--batch-size", type=int, default=4)
     ap.add_argument("--lora-layers", type=int, default=16,

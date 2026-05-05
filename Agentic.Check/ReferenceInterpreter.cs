@@ -253,22 +253,36 @@ public sealed class ReferenceInterpreter
 
     private Value EvalDefun(SList list, Frame env)
     {
-        // (defun f ((x : T) (y : T)) : R body...)
+        // Accepts: (defun f ((x : T) (y : T)) : R body...)
+        //          (defun f ((x T) (y T)) R body...)      ← colon-less typed
+        //          (defun f (x y) body...)                ← untyped
         string name = ((Atom)list.Elements[1]).Value;
         var paramList = (SList)list.Elements[2];
         var paramNames = new List<string>();
         foreach (var p in paramList.Elements)
         {
-            // param may be "x" (untyped) or (x : T)
             if (p is Atom pa) paramNames.Add(pa.Value);
             else if (p is SList ps && ps.Elements.Count > 0 && ps.Elements[0] is Atom pn)
                 paramNames.Add(pn.Value);
         }
-        // Skip optional `: <ReturnType>` annotation; remaining forms are the body.
         int bodyStart = 3;
-        if (bodyStart < list.Elements.Count
-            && list.Elements[bodyStart] is Atom colon && colon.Value == ":")
-            bodyStart += 2;
+        if (bodyStart < list.Elements.Count)
+        {
+            // Verbose form: `: RetType` — skip 2 elements.
+            if (list.Elements[bodyStart] is Atom colon && colon.Value == ":")
+                bodyStart += 2;
+            // Colon-less form: bare type atom as return annotation.
+            else if (list.Elements[bodyStart] is Atom typeAtom
+                     && IsTypeName(typeAtom.Value)
+                     && bodyStart + 1 < list.Elements.Count)
+                bodyStart += 1;
+            // Colon-less form with constructor type: (Array T) / (Map T) / (Func ... R).
+            else if (list.Elements[bodyStart] is SList typeList
+                     && typeList.Elements.Count > 0
+                     && typeList.Elements[0] is Atom ctor
+                     && (ctor.Value is "Array" or "Map" or "Func"))
+                bodyStart += 1;
+        }
 
         Node body;
         int bodyCount = list.Elements.Count - bodyStart;
@@ -477,18 +491,30 @@ public sealed class ReferenceInterpreter
     private static bool IsBinOp(string s) => s is "+" or "-" or "*" or "/" or
         "<" or ">" or "=" or "<=" or ">=" or "and" or "or" or "not";
 
+    // Used to detect an optional colon-less return-type annotation on defun.
+    // Num/Str/Bool are the primitives; capitalised identifiers are struct names.
+    private static bool IsTypeName(string s) =>
+        s is "Num" or "Str" or "Bool" || (s.Length > 0 && char.IsUpper(s[0]));
+
     private Value EvalBinOp(string op, SList list, Frame env)
     {
         if (op == "not")
             return new Value.Bool(!IsTruthy(Eval(list.Elements[1], env)));
+        // Arithmetic supports n-ary left fold: (+ a b c) = ((a+b)+c).
+        if (op is "+" or "-" or "*" or "/")
+        {
+            double acc = AsNum(Eval(list.Elements[1], env));
+            for (int i = 2; i < list.Elements.Count; i++)
+            {
+                double r = AsNum(Eval(list.Elements[i], env));
+                acc = op switch { "+" => acc + r, "-" => acc - r, "*" => acc * r, "/" => acc / r, _ => acc };
+            }
+            return new Value.Num(acc);
+        }
         var a = Eval(list.Elements[1], env);
         var b = Eval(list.Elements[2], env);
         return op switch
         {
-            "+" => new Value.Num(AsNum(a) + AsNum(b)),
-            "-" => new Value.Num(AsNum(a) - AsNum(b)),
-            "*" => new Value.Num(AsNum(a) * AsNum(b)),
-            "/" => new Value.Num(AsNum(a) / AsNum(b)),
             "<" => new Value.Bool(AsNum(a) < AsNum(b)),
             ">" => new Value.Bool(AsNum(a) > AsNum(b)),
             "=" => new Value.Bool(ValueEquals(a, b)),

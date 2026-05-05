@@ -7,7 +7,7 @@
     "fine_tune_type": "lora",
     "grad_accumulation_steps": 1,
     "grad_checkpoint": false,
-    "iters": 560,
+    "iters": 790,
     "learning_rate": 0.0001,
     "lora_parameters": {
         "rank": 8,
@@ -17,7 +17,7 @@
     "lr_schedule": null,
     "mask_prompt": true,
     "max_seq_length": 2048,
-    "model": "mlx-community/Qwen2.5-Coder-1.5B-Instruct-4bit",
+    "model": "mlx-community/Qwen2.5-Coder-3B-Instruct-4bit",
     "num_layers": 16,
     "optimizer": "adam",
     "optimizer_config": {

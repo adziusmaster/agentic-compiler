@@ -545,11 +545,18 @@ public sealed class Verifier
 
     private double ExecuteMath(string op, ListNode list)
     {
-        double l = Convert.ToDouble(Evaluate(list.Elements[1]));
-        double r = Convert.ToDouble(Evaluate(list.Elements[2]));
-        if (op == "/" && r == 0.0)
-            throw new InvalidOperationException("Division by zero: divisor is 0.");
-        return op switch { "+" => l + r, "-" => l - r, "*" => l * r, "/" => l / r, _ => 0 };
+        // N-ary via left fold: (+ a b c d) = ((a+b)+c)+d. Requires ≥2 operands.
+        if (list.Elements.Count < 3)
+            throw new InvalidOperationException($"'{op}' requires at least 2 operands.");
+        double acc = Convert.ToDouble(Evaluate(list.Elements[1]));
+        for (int i = 2; i < list.Elements.Count; i++)
+        {
+            double r = Convert.ToDouble(Evaluate(list.Elements[i]));
+            if (op == "/" && r == 0.0)
+                throw new InvalidOperationException("Division by zero: divisor is 0.");
+            acc = op switch { "+" => acc + r, "-" => acc - r, "*" => acc * r, "/" => acc / r, _ => acc };
+        }
+        return acc;
     }
 
     private object? ExecuteStdoutWrite(ListNode list)
@@ -598,8 +605,11 @@ public sealed class Verifier
 
     private object? ExecuteWhile(ListNode list)
     {
+        // Implicit do: (while cond b1 b2 ...) iterates each body form per cycle.
         object? res = null;
-        while (Convert.ToBoolean(Evaluate(list.Elements[1]))) res = Evaluate(list.Elements[2]);
+        while (Convert.ToBoolean(Evaluate(list.Elements[1])))
+            for (int i = 2; i < list.Elements.Count; i++)
+                res = Evaluate(list.Elements[i]);
         return res;
     }
 

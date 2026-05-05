@@ -81,10 +81,11 @@ public static class TypeAnnotations
     /// Extracts the signature from a <c>(defun ...)</c> AST node.
     /// </summary>
     /// <remarks>
-    /// Supports two syntaxes:
+    /// Supports three syntaxes (LLM-friendly progressive compression):
     /// <list type="bullet">
-    ///   <item><c>(defun name (p1 p2) body)</c> — untyped; params default to Num, return defaults to Num.</item>
-    ///   <item><c>(defun name ((p1 : T1) (p2 : T2)) : RetT body)</c> — explicitly typed.</item>
+    ///   <item><c>(defun name ((p1 : T1) (p2 : T2)) : RetT body)</c> — verbose typed.</item>
+    ///   <item><c>(defun name ((p1 T1) (p2 T2)) RetT body)</c> — colon-less typed.</item>
+    ///   <item><c>(defun name (p1 p2) body)</c> — untyped; defaults to Num/Num.</item>
     /// </list>
     /// </remarks>
     public static DefunSignature ParseDefun(ListNode defunList)
@@ -102,6 +103,13 @@ public static class TypeAnnotations
             returnType = ParseAnnotation(defunList.Elements[4]);
             bodyStart = 5;
         }
+        else if (defunList.Elements.Count >= 5
+                 && IsTypeNode(defunList.Elements[3]))
+        {
+            // Colon-less return type: (defun name (args) Num body...)
+            returnType = ParseAnnotation(defunList.Elements[3]);
+            bodyStart = 4;
+        }
         else
         {
             returnType = AgType.Num;
@@ -110,6 +118,27 @@ public static class TypeAnnotations
 
         var body = WrapBody(defunList.Elements, bodyStart);
         return new DefunSignature(name, parameters, returnType, body);
+    }
+
+    /// <summary>
+    /// Returns true when the node names a type (Num/Str/Bool, a capitalised
+    /// struct name, or a type constructor like (Array T)/(Map T)/(Func ... R)).
+    /// Used to disambiguate a trailing type annotation from a body expression.
+    /// </summary>
+    private static bool IsTypeNode(AstNode node)
+    {
+        if (node is AtomNode atom)
+        {
+            string v = atom.Token.Value;
+            if (v is "Num" or "Str" or "Bool") return true;
+            return v.Length > 0 && char.IsUpper(v[0]);
+        }
+        if (node is ListNode list && list.Elements.Count > 0
+            && list.Elements[0] is AtomNode head)
+        {
+            return head.Token.Value is "Array" or "Map" or "Func";
+        }
+        return false;
     }
 
     /// <summary>
@@ -170,6 +199,13 @@ public static class TypeAnnotations
             return (name, type, defList.Elements[4]);
         }
 
+        // Colon-less typed: (def x Num 5) — exactly 4 elements, 3rd is a type.
+        if (defList.Elements.Count == 4 && IsTypeNode(defList.Elements[2]))
+        {
+            var type = ParseAnnotation(defList.Elements[2]);
+            return (name, type, defList.Elements[3]);
+        }
+
         return (name, null, defList.Elements[2]);
     }
 
@@ -200,7 +236,12 @@ public static class TypeAnnotations
     }
 
     /// <summary>
-    /// Parses a parameter list, handling both untyped atoms and typed <c>(name : Type)</c> pairs.
+    /// Parses a parameter list. Accepts (in decreasing verbosity):
+    /// <list type="bullet">
+    ///   <item><c>(p : Num)</c> — explicit typed with colon.</item>
+    ///   <item><c>(p Num)</c> — colon-less typed shorthand.</item>
+    ///   <item><c>p</c> — untyped; defaults to Num.</item>
+    /// </list>
     /// </summary>
     private static IReadOnlyList<(string Param, AgType Type)> ParseParameters(ListNode paramList)
     {
@@ -218,6 +259,13 @@ public static class TypeAnnotations
                      && typed.Elements[1] is AtomNode { Token.Value: ":" })
             {
                 result.Add((nameAtom.Token.Value, ParseAnnotation(typed.Elements[2])));
+            }
+            else if (element is ListNode shortTyped
+                     && shortTyped.Elements.Count == 2
+                     && shortTyped.Elements[0] is AtomNode shortName
+                     && IsTypeNode(shortTyped.Elements[1]))
+            {
+                result.Add((shortName.Token.Value, ParseAnnotation(shortTyped.Elements[1])));
             }
         }
 

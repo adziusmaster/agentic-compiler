@@ -56,6 +56,28 @@ public static class Parser
         return ClassifyAtom(tok);
     }
 
+    // LLM-friendly aliases: `math_pow` / `str_eq` / `arr_get` are BPE-cheap
+    // equivalents of `math.pow` / `str.eq` / `arr.get`. `eq?` / `near?` are
+    // aliases for `assert-eq` / `assert-near`. We normalize at atom-classification
+    // time so every downstream interpreter rule sees the canonical dotted form.
+    // Only normalize PURE stdlib namespaces. Capability namespaces stay distinct
+    // so that user externs (e.g. file_read) don't collide with capability names
+    // (e.g. file.read) and accidentally bypass mock dispatch.
+    private static readonly HashSet<string> _pureStdlibPrefixes = new()
+    {
+        "math", "str", "arr", "map", "json"
+    };
+
+    private static string Normalize(string tok)
+    {
+        if (tok == "eq?") return "assert-eq";
+        if (tok == "near?") return "assert-near";
+        int idx = tok.IndexOf('_');
+        if (idx > 0 && _pureStdlibPrefixes.Contains(tok[..idx]))
+            return string.Concat(tok.AsSpan(0, idx), ".", tok.AsSpan(idx + 1));
+        return tok;
+    }
+
     private static Atom ClassifyAtom(string tok)
     {
         if (tok.Length >= 2 && tok[0] == '"' && tok[^1] == '"')
@@ -65,7 +87,7 @@ public static class Parser
         if (double.TryParse(tok, System.Globalization.NumberStyles.Float,
             System.Globalization.CultureInfo.InvariantCulture, out _))
             return new Atom(tok, AtomKind.Number);
-        return new Atom(tok, AtomKind.Symbol);
+        return new Atom(Normalize(tok), AtomKind.Symbol);
     }
 
     private static IReadOnlyList<string> Tokenize(string source)

@@ -297,7 +297,11 @@ public sealed class Transpiler
 
             case "while":
                 sb.AppendLine($"    while ({TranspileExpression(list.Elements[1])}) {{");
-                TranspileNode(list.Elements[2], sb);
+                // Implicit `do`: a (while cond b1 b2 ...) behaves like
+                // (while cond (do b1 b2 ...)). This is a paper-level AGC
+                // convenience for LLM authorship — no explicit (do ...) wrapper.
+                for (int i = 2; i < list.Elements.Count; i++)
+                    TranspileNode(list.Elements[i], sb);
                 sb.AppendLine("    }");
                 break;
 
@@ -462,7 +466,15 @@ public sealed class Transpiler
         var op = ((AtomNode)list.Elements[0]).Token.Value;
 
         if (op is "+" or "-" or "*" or "/")
-            return $"({TranspileExpression(list.Elements[1])} {op} {TranspileExpression(list.Elements[2])})";
+        {
+            // N-ary (n>=2) via left fold: (+ a b c) -> ((a + b) + c)
+            if (list.Elements.Count < 3)
+                throw new Exception($"Compile Error: '{op}' requires at least 2 operands.");
+            var folded = TranspileExpression(list.Elements[1]);
+            for (int i = 2; i < list.Elements.Count; i++)
+                folded = $"({folded} {op} {TranspileExpression(list.Elements[i])})";
+            return folded;
+        }
         if (op is "<" or ">" or "<=" or ">=")
             return $"({TranspileExpression(list.Elements[1])} {op} {TranspileExpression(list.Elements[2])})";
         if (op == "=")

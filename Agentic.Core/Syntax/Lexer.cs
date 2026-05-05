@@ -159,9 +159,32 @@ public sealed class Lexer
             Advance();
         }
 
-        string value = sb.ToString();
+        string value = NormalizeIdentifier(sb.ToString());
         TokenType type = double.TryParse(value, out _) ? TokenType.Number : TokenType.Identifier;
 
         return new Token(type, value, startLine, startColumn);
+    }
+
+    // LLM-friendly aliases: the language accepts `math_pow` and `str_eq` as
+    // equivalent to `math.pow` / `str.eq`. BPE tokenizers don't split the
+    // underscore form so the model emits fewer tokens. Only PURE stdlib
+    // namespaces are normalized; capability namespaces (env/file/http/db/...)
+    // intentionally stay distinct so the user's `(extern defun file_read …
+    // @capability "file.read")` indirection routes through the mock layer.
+    private static readonly HashSet<string> _pureStdlibPrefixes = new()
+    {
+        "math", "str", "arr", "map", "json"
+    };
+
+    private static string NormalizeIdentifier(string value)
+    {
+        // Lean assertion aliases: `eq?` → `assert-eq`, `near?` → `assert-near`.
+        if (value == "eq?") return "assert-eq";
+        if (value == "near?") return "assert-near";
+        // Underscore-prefixed stdlib form → dotted form (math/str/arr/map/json only).
+        int idx = value.IndexOf('_');
+        if (idx > 0 && _pureStdlibPrefixes.Contains(value[..idx]))
+            return string.Concat(value.AsSpan(0, idx), ".", value.AsSpan(idx + 1));
+        return value;
     }
 }

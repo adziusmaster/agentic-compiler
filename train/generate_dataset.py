@@ -59,6 +59,17 @@ PURE_TOPICS = [
     "average of array values", "median of three via array",
     "fibonacci iterative", "collatz steps", "digital root",
     "is prime trial division", "gcd euclidean", "lcm", "power of integer",
+    # Targeted at v3 failure modes — string iteration, balance counters
+    "count words separated by spaces", "reverse a string character by character",
+    "is char a vowel", "is char a digit", "is char whitespace",
+    "split string on space then count words", "join two strings with separator",
+    "count occurrences of a character in a string",
+    "check string contains a character",
+    "count opening parens minus closing parens",
+    "balanced parentheses depth counter",
+    "find first non-space character index",
+    "string to lowercase manual loop",
+    "longest run of same character in a string",
 ]
 
 CAP_TOPICS = [
@@ -69,6 +80,13 @@ CAP_TOPICS = [
     "write fixed string to file",
     "http GET body length", "http GET status as string",
     "db scalar count", "db exists check",
+    # Edge cases the v3 model still misses
+    "env var with whitespace trimming",
+    "file content first character",
+    "file size as number",
+    "http GET body's first word",
+    "two file reads concatenated",
+    "env var split on comma into count",
 ]
 
 MULTI_TOPICS = [
@@ -98,167 +116,181 @@ MULTI_TOPICS = [
     "phone plan with overage",
     "ride fare base plus distance",
     "gym membership with joining fee",
+    # Targeted at v3 failure modes — multi-step float arithmetic with rounding
+    "amortizing loan payment formula",
+    "compound interest with quarterly compounding",
+    "bracket-tier income tax calculation",
+    "shipping cost with weight tiers and zone surcharge",
+    "tip calculation split among diners with rounding",
+    "savings account growth over n years",
+    "bond yield to maturity simple",
+    "discounted price after coupon and bulk-buy threshold",
+    "freelance billable hours with overtime multiplier",
+    "currency conversion with bid-ask spread",
+    "depreciation over n years straight line",
+    "monthly subscription cost with annual discount",
+    "sales tax inclusive vs exclusive price",
+    "ticket pricing tiered by age group",
+    "package weight cost with surcharge per excess kilogram",
 ]
 
 FEW_SHOT = {
     "pure": [
 """(module DigitSum
-  (defun digit_sum ((n : Num)) : Num
-    (def acc : Num 0)
-    (def cur : Num n)
-    (while (> cur 0) (do
-      (def acc : Num (+ acc (math.mod cur 10)))
-      (def cur : Num (math.floor (/ cur 10)))))
-    (return acc))
+  (defun digit_sum (n)
+    (def acc 0)
+    (def cur n)
+    (while (> cur 0)
+      (set acc (+ acc (math_mod cur 10)))
+      (set cur (math_floor (/ cur 10))))
+    acc)
 
-  (test zero (assert-eq (digit_sum 0) 0))
-  (test small (assert-eq (digit_sum 7) 7))
-  (test two_digit (assert-eq (digit_sum 42) 6))
-  (test big (assert-eq (digit_sum 12345) 15)))""",
+  (test zero      (eq? (digit_sum 0) 0))
+  (test small     (eq? (digit_sum 7) 7))
+  (test two_digit (eq? (digit_sum 42) 6))
+  (test big       (eq? (digit_sum 12345) 15)))""",
 """(module IsPrime
-  (defun is_prime ((n : Num)) : Num
-    (if (< n 2) (return 0) 0)
-    (if (= n 2) (return 1) 0)
-    (if (= (math.mod n 2) 0) (return 0) 0)
-    (def i : Num 3)
-    (def bound : Num (math.floor (math.sqrt n)))
-    (while (<= i bound) (do
-      (if (= (math.mod n i) 0) (return 0) 0)
-      (def i : Num (+ i 2))))
-    (return 1))
+  (defun is_prime (n)
+    (if (< n 2) (return 0))
+    (if (= n 2) (return 1))
+    (if (= (math_mod n 2) 0) (return 0))
+    (def i 3)
+    (def bound (math_floor (math_sqrt n)))
+    (while (<= i bound)
+      (if (= (math_mod n i) 0) (return 0))
+      (set i (+ i 2)))
+    1)
 
-  (test two (assert-eq (is_prime 2) 1))
-  (test four (assert-eq (is_prime 4) 0))
-  (test seventeen (assert-eq (is_prime 17) 1)))""",
+  (test two       (eq? (is_prime 2) 1))
+  (test four      (eq? (is_prime 4) 0))
+  (test seventeen (eq? (is_prime 17) 1)))""",
 """(module ArraySum
-  (defun sum ((xs : (Array Num))) : Num
-    (def i : Num 0)
-    (def n : Num (arr.length xs))
-    (def total : Num 0)
-    (while (< i n) (do
-      (def total : Num (+ total (arr.get xs i)))
-      (def i : Num (+ i 1))))
-    (return total))
+  (defun sum (xs)
+    (def i 0)
+    (def n (arr_length xs))
+    (def total 0)
+    (while (< i n)
+      (set total (+ total (arr_get xs i)))
+      (set i (+ i 1)))
+    total)
 
-  (defun make3 ((a : Num) (b : Num) (c : Num)) : (Array Num)
-    (def xs : (Array Num) (arr.new 3))
-    (arr.set xs 0 a)
-    (arr.set xs 1 b)
-    (arr.set xs 2 c)
-    (return xs))
+  (defun make3 (a b c)
+    (def xs (arr_new 3))
+    (arr_set xs 0 a)
+    (arr_set xs 1 b)
+    (arr_set xs 2 c)
+    xs)
 
-  (test empty (assert-eq (sum (arr.new 0)) 0))
-  (test one   (assert-eq (sum (make3 5 0 0)) 5))
-  (test three (assert-eq (sum (make3 1 2 3)) 6))
-  (test negs  (assert-eq (sum (make3 -1 -2 -3)) -6)))""",
+  (test empty (eq? (sum (arr_new 0)) 0))
+  (test one   (eq? (sum (make3 5 0 0)) 5))
+  (test three (eq? (sum (make3 1 2 3)) 6))
+  (test negs  (eq? (sum (make3 -1 -2 -3)) -6)))""",
     ],
     "cap": [
 """(module EnvOrDefault
-  (extern defun env_read ((key : Str)) : Str @capability "env.get")
+  (extern defun env_read (key) @capability "env.get")
 
-  (defun get_or ((key : Str) (default : Str)) : Str
-    (def val : Str (env_read key))
-    (if (str.eq val "") (return default) (return val)))
+  (defun get_or (key default)
+    (def val (env_read key))
+    (if (str_eq val "") (return default))
+    val)
 
-  (test missing (mocks (env.get "NAME" "")) (assert-eq (get_or "NAME" "anon") "anon"))
-  (test present (mocks (env.get "NAME" "Ada")) (assert-eq (get_or "NAME" "anon") "Ada")))""",
+  (test missing (mocks (env.get "NAME" "")) (eq? (get_or "NAME" "anon") "anon"))
+  (test present (mocks (env.get "NAME" "Ada")) (eq? (get_or "NAME" "anon") "Ada")))""",
 """(module EnvIntOr
-  (extern defun env_read ((key : Str)) : Str @capability "env.get")
+  (extern defun env_read (key) @capability "env.get")
 
-  (defun port_or ((key : Str) (default : Num)) : Num
-    (def val : Str (env_read key))
-    (if (str.eq val "") (return default) (return (str.to_num val))))
+  (defun port_or (key default)
+    (def val (env_read key))
+    (if (str_eq val "") (return default))
+    (str_to_num val))
 
-  (test missing (mocks (env.get "PORT" "")) (assert-eq (port_or "PORT" 8080) 8080))
-  (test present (mocks (env.get "PORT" "3000")) (assert-eq (port_or "PORT" 8080) 3000))
-  (test zero    (mocks (env.get "PORT" "0")) (assert-eq (port_or "PORT" 8080) 0)))""",
+  (test missing (mocks (env.get "PORT" "")) (eq? (port_or "PORT" 8080) 8080))
+  (test present (mocks (env.get "PORT" "3000")) (eq? (port_or "PORT" 8080) 3000))
+  (test zero    (mocks (env.get "PORT" "0")) (eq? (port_or "PORT" 8080) 0)))""",
 """(module FileLineCount
-  (extern defun file_read ((path : Str)) : Str @capability "file.read")
+  (extern defun file_read (path) @capability "file.read")
 
-  (defun line_count ((path : Str)) : Num
-    (def content : Str (file_read path))
-    (def n : Num (str.length content))
-    (def i : Num 0)
-    (def count : Num 0)
-    (while (< i n) (do
-      (if (str.eq (str.substring content i 1) "\\n")
-        (def count : Num (+ count 1))
-        0)
-      (def i : Num (+ i 1))))
-    (return count))
+  (defun line_count (path)
+    (def content (file_read path))
+    (def n (str_length content))
+    (def i 0)
+    (def count 0)
+    (while (< i n)
+      (if (str_eq (str_substring content i 1) "\\n") (set count (+ count 1)))
+      (set i (+ i 1)))
+    count)
 
-  (test empty (mocks (file.read "/f" "")) (assert-eq (line_count "/f") 0))
-  (test one   (mocks (file.read "/f" "a\\n")) (assert-eq (line_count "/f") 1))
-  (test two   (mocks (file.read "/f" "a\\nb\\n")) (assert-eq (line_count "/f") 2)))""",
+  (test empty (mocks (file.read "/f" "")) (eq? (line_count "/f") 0))
+  (test one   (mocks (file.read "/f" "a\\n")) (eq? (line_count "/f") 1))
+  (test two   (mocks (file.read "/f" "a\\nb\\n")) (eq? (line_count "/f") 2)))""",
 """(module DbUrl
-  (extern defun env_read ((key : Str)) : Str @capability "env.get")
+  (extern defun env_read (key) @capability "env.get")
 
-  (defun db_url () : Str
-    (def h : Str (env_read "DB_HOST"))
-    (def p : Str (env_read "DB_PORT"))
-    (if (str.eq h "") (return "localhost:5432") 0)
-    (if (str.eq p "") (return "localhost:5432") 0)
-    (return (str.concat h (str.concat ":" p))))
+  (defun db_url ()
+    (def h (env_read "DB_HOST"))
+    (def p (env_read "DB_PORT"))
+    (if (str_eq h "") (return "localhost:5432"))
+    (if (str_eq p "") (return "localhost:5432"))
+    (str_concat h (str_concat ":" p)))
 
   (test both_present
     (mocks (env.get "DB_HOST" "db.example.com")
            (env.get "DB_PORT" "5555"))
-    (assert-eq (db_url) "db.example.com:5555"))
+    (eq? (db_url) "db.example.com:5555"))
   (test host_missing
     (mocks (env.get "DB_HOST" "")
            (env.get "DB_PORT" "5555"))
-    (assert-eq (db_url) "localhost:5432")))""",
-"""(module FileCopy
-  (extern defun file_read ((path : Str)) : Str @capability "file.read")
-  (extern defun file_write ((path : Str) (data : Str)) : Num @capability "file.write")
-
-  (defun copy_upper ((src : Str) (dst : Str)) : Num
-    (def content : Str (file_read src))
-    (def upper : Str (str.upper content))
-    (return (file_write dst upper)))
-
-  (test basic
-    (mocks (file.read "/a" "hello")
-           (file.write "/b" "HELLO" 5))
-    (assert-eq (copy_upper "/a" "/b") 5)))""",
+    (eq? (db_url) "localhost:5432")))""",
     ],
     "multi": [
 """(module InvoiceTotal
-  (defun subtotal ((unit : Num) (qty : Num)) : Num
-    (return (* unit qty)))
+  (defun subtotal (unit qty) (* unit qty))
+  (defun apply_discount (amount pct) (- amount (/ (* amount pct) 100)))
+  (defun apply_tax (amount pct) (* amount (+ 1 (/ pct 100))))
+  (defun round2 (x) (/ (math_floor (+ (* x 100) 0.5)) 100))
 
-  (defun apply_discount ((amount : Num) (pct : Num)) : Num
-    (return (- amount (/ (* amount pct) 100))))
+  (defun invoice_total (unit qty disc tax ship)
+    (def s (subtotal unit qty))
+    (def d (apply_discount s disc))
+    (def t (apply_tax d tax))
+    (round2 (+ t ship)))
 
-  (defun apply_tax ((amount : Num) (pct : Num)) : Num
-    (return (* amount (+ 1 (/ pct 100)))))
-
-  (defun round2 ((x : Num)) : Num
-    (return (/ (math.floor (+ (* x 100) 0.5)) 100)))
-
-  (defun invoice_total ((unit : Num) (qty : Num) (disc : Num) (tax : Num) (ship : Num)) : Num
-    (def s : Num (subtotal unit qty))
-    (def d : Num (apply_discount s disc))
-    (def t : Num (apply_tax d tax))
-    (return (round2 (+ t ship))))
-
-  (test plain (assert-near (invoice_total 10 2 0 0 0) 20 0.01))
-  (test full (assert-near (invoice_total 100 3 10 20 5) 329 0.01)))""",
+  (test plain (near? (invoice_total 10 2 0 0 0) 20 0.01))
+  (test full  (near? (invoice_total 100 3 10 20 5) 329 0.01)))""",
     ],
 }
 
-SYSTEM = """You are generating AGC (Agentic Compiler) training data.
+SYSTEM = """You are generating AGC training data. AGC is an S-expression language DESIGNED FOR LLMs — maximally compact syntax.
 
-AGC is an S-expression language. Strict conventions:
-- Type annotations use `: Type` (never `->`). Every parameter MUST be annotated.
-- Types: Num, Str, Bool, (Array T).
-- Forms: (defun name ((p : T)...) : T body), (def name : T expr),
-  (if c then else), (while c (do ...)), (return e), (require c).
-- Math is strictly binary: (+ a (+ b c)) never (+ a b c).
-- Stdlib: math.* (pow floor sqrt mod abs min max), str.* (eq split join substring to_num from_num lower upper length index_of concat), arr.* (new get set length).
-- Tests: (test name (assert-eq actual expected)) or (assert-near a b tol).
-- Capability FFI: (extern defun name ((p : T)) : T @capability "cap.name"), with (mocks (cap.name args return)) in tests.
-- Do NOT use list.*, prose comments, markdown fences, sys.input.get, or sys.stdout.write.
+LEAN SYNTAX (always use, never the verbose form):
+- Defuns: `(defun name (a b c) body)` — no parameter types, no return type, no colons.
+- Local defs: `(def x 5)` — no type annotation.
+- Update variables: `(set x new_val)` — never shadow with def.
+- N-ary math: `(+ a b c d)`, `(* a b)`. Never nest binary math.
+- Single-branch if: `(if c (return x))` with no else.
+- Multi-form while: `(while c body1 body2 body3)` — no (do …) wrapper.
+- Implicit return: last expression is the return value. Only use `(return e)` for early exit.
+- Test asserts: `(eq? a b)` and `(near? a b tol)` — NOT assert-eq/assert-near.
+
+STDLIB (use underscore form, NEVER dotted):
+- Math: `math_pow math_floor math_ceil math_sqrt math_mod math_abs math_min math_max math_log math_sin math_cos`
+- Strings: `str_eq str_split str_join str_substring str_to_num str_from_num str_lower str_upper str_length str_index_of str_concat`
+- Arrays: `arr_new arr_get arr_set arr_length`
+
+FORMS: (defun name (params) body), (def name expr), (set name expr), (if c then [else]), (while c body...), (return e), (require c).
+
+TESTS: (test name (eq? actual expected)) or (near? a b tol).
+
+CAPABILITIES (for cap category): `(extern defun name (p) @capability "cap.name")` — no type annotations. Tests: `(mocks (cap.name args return))` inside each (test …).
+
+RUNTIME SAFETY:
+- str_to_num throws on non-numeric input. Only feed it numeric strings.
+- arr_get / arr_set throw on out-of-bounds.
+- Division by zero throws. Math on negatives that are undefined throws.
+- For cap: tests must only use mocked-return values the function can handle.
+
+Do NOT use: prose comments, markdown fences, dotted names (math.pow/str.eq/arr.get), type annotations on defun/def, assert-eq/assert-near, sys.input.get, sys.stdout.write.
 
 IMPORTANT RUNTIME SAFETY:
 - str.to_num THROWS on non-numeric input. NEVER feed it a value that cannot parse (like "abc", "xyz", "N/A"). If you need fault tolerance, branch with (str.eq ...) first.

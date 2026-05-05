@@ -36,37 +36,109 @@ def read(path: Path) -> str:
     return path.read_text()
 
 
-def build_prompt(objective: str, tests_ag: str) -> str:
-    return (f"Write an AGC module that satisfies this objective:\n\n{objective}\n\n"
-            f"Your module MUST include these tests exactly:\n\n"
-            f"```\n{tests_ag}\n```\n\nOutput ONLY the module source.")
+PROMPT_STYLES = ("fence", "inline", "match-training", "minimal", "inline-sig")
+
+
+def extract_signature_hints(tests_ag: str) -> str:
+    """Find every `(name arg1 arg2 ...)` call inside an assert-eq/near and
+    report the function name + arity. Used as a prompt hint so the model
+    matches the bench tests' expected signature.
+    """
+    seen: dict[str, int] = {}
+    # Match assert-eq / near?  /  eq?  / assert-near forms; capture inner call
+    pattern = re.compile(r"\((?:assert-eq|assert-near|eq\?|near\?)\s+\(([a-z_][a-z0-9_]*)\b([^)]*?)\)")
+    for m in pattern.finditer(tests_ag):
+        name = m.group(1)
+        argstr = m.group(2)
+        # crude arg count: split by whitespace, ignore strings/parens
+        depth = 0
+        in_str = False
+        toks = 0
+        cur = ""
+        for ch in argstr.strip():
+            if in_str:
+                if ch == '"': in_str = False
+                cur += ch; continue
+            if ch == '"': in_str = True; cur += ch
+            elif ch == "(": depth += 1; cur += ch
+            elif ch == ")": depth -= 1; cur += ch
+            elif ch.isspace() and depth == 0:
+                if cur: toks += 1; cur = ""
+            else:
+                cur += ch
+        if cur: toks += 1
+        if name not in seen:
+            seen[name] = toks
+    if not seen:
+        return ""
+    lines = [f"  - `{n}` takes {a} argument(s)" for n, a in seen.items()]
+    return "Function signatures (from the test calls):\n" + "\n".join(lines)
+
+
+def build_prompt(objective: str, tests_ag: str, style: str = "fence") -> str:
+    if style == "fence":
+        # Original eval prompt — markdown fence around tests.
+        return (f"Write an AGC module that satisfies this objective:\n\n{objective}\n\n"
+                f"Your module MUST include these tests exactly:\n\n"
+                f"```\n{tests_ag}\n```\n\nOutput ONLY the module source.")
+    if style == "inline":
+        # No markdown fence; tests inline as natural S-expressions.
+        return (f"Write an AGC module that satisfies this objective:\n\n{objective}\n\n"
+                f"The module must include these (test ...) blocks:\n\n{tests_ag}\n\n"
+                f"Output ONLY the module source.")
+    if style == "match-training":
+        # Closer to training distribution: phrasing identical to fine-tune
+        # data, tests appended at the end naturally.
+        return (f"Write an AGC module that satisfies this objective:\n\n{objective}\n\n"
+                f"Include self-verifying (test ...) blocks. Output ONLY the module source.\n\n"
+                f"Use exactly these test forms:\n\n{tests_ag}")
+    if style == "minimal":
+        # Trust the fine-tuning — minimal framing.
+        return f"{objective}\n\n{tests_ag}"
+    if style == "inline-sig":
+        # Inline + signature hints extracted from test call sites.
+        sig = extract_signature_hints(tests_ag)
+        return (f"Write an AGC module that satisfies this objective:\n\n{objective}\n\n"
+                + (f"{sig}\n\n" if sig else "")
+                + f"The module must include these (test ...) blocks:\n\n{tests_ag}\n\n"
+                + "Output ONLY the module source.")
+    raise ValueError(f"unknown prompt style: {style}")
 
 
 def build_retry_prompt(objective: str, tests_ag: str,
-                       previous_source: str, diagnostic: str) -> str:
+                       previous_source: str, diagnostic: str,
+                       style: str = "fence") -> str:
+    if style == "minimal":
+        return (
+            f"Previous module failed. Diagnostic:\n{diagnostic}\n\n"
+            f"Previous:\n{previous_source}\n\n"
+            f"Rewrite to satisfy:\n{objective}\n\n{tests_ag}"
+        )
     return (
         f"Your previous AGC module failed. Here is the diagnostic from agc check:\n\n"
         f"{diagnostic}\n\n"
-        f"Previous module:\n```\n{previous_source}\n```\n\n"
-        f"Rewrite the module from scratch to satisfy this objective:\n\n{objective}\n\n"
-        f"Include these tests exactly:\n\n```\n{tests_ag}\n```\n\n"
+        f"Previous module:\n{previous_source}\n\n"
+        f"Rewrite the module to satisfy this objective:\n\n{objective}\n\n"
+        f"Include these test forms:\n\n{tests_ag}\n\n"
         f"Output ONLY the corrected module source."
     )
 
 
 def generate_with_lora(model: str, adapter: str, prompt: str,
-                       max_tokens: int = 1024) -> tuple[str, int, int]:
+                       max_tokens: int = 1024,
+                       use_system: bool = True) -> tuple[str, int, int]:
     """Invoke mlx_lm.generate CLI. Returns (raw_text, tokens_in, tokens_out)."""
     cmd = [
         sys.executable, "-m", "mlx_lm", "generate",
         "--model", model,
         "--adapter-path", adapter,
-        "--system-prompt", SYSTEM_PROMPT,
         "--prompt", prompt,
         "--max-tokens", str(max_tokens),
         "--temp", "0.0",
         "--extra-eos-token", "<|im_end|>",
     ]
+    if use_system:
+        cmd += ["--system-prompt", SYSTEM_PROMPT]
     t0 = time.monotonic()
     proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
     dt = time.monotonic() - t0
@@ -144,12 +216,14 @@ def count_loc(source: str) -> int:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--model", default="mlx-community/Qwen2.5-Coder-1.5B-Instruct-4bit")
+    ap.add_argument("--model", default="mlx-community/Qwen2.5-Coder-3B-Instruct-4bit")
     ap.add_argument("--adapter", default=str(TRAIN_DIR / "lora_adapter"))
     ap.add_argument("--only", help="comma-sep problem prefixes, e.g. 01,11,21")
     ap.add_argument("--out", help="override output jsonl path")
     ap.add_argument("--max-attempts", type=int, default=5,
                     help="retry budget per problem (feed agc-check errors back)")
+    ap.add_argument("--prompt-style", choices=PROMPT_STYLES, default="match-training",
+                    help="prompt construction (fence/inline/match-training/minimal)")
     args = ap.parse_args()
 
     date = time.strftime("%Y-%m-%d")
@@ -177,11 +251,13 @@ def main() -> int:
         last_err_cat = None
         attempt = 0
 
+        use_system = args.prompt_style != "minimal"
         for attempt in range(1, args.max_attempts + 1):
-            prompt = (build_prompt(obj, tests_ag) if attempt == 1
-                      else build_retry_prompt(obj, tests_ag, module or "", err))
+            prompt = (build_prompt(obj, tests_ag, args.prompt_style) if attempt == 1
+                      else build_retry_prompt(obj, tests_ag, module or "", err, args.prompt_style))
             try:
-                raw, tin, tout = generate_with_lora(args.model, args.adapter, prompt)
+                raw, tin, tout = generate_with_lora(args.model, args.adapter, prompt,
+                                                    use_system=use_system)
             except Exception as e:
                 err = f"gen-error: {e}"
                 last_err_cat = "gen-error"
