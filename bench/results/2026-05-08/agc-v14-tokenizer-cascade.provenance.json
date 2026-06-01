@@ -1,0 +1,15 @@
+{
+  "tokenizer": "qwen-extended-v1",
+  "tokenizer_path": "train/agc_tokenizer",
+  "tokenizer_added_tokens": 227,
+  "tokenizer_construction": "curated from agc_stdlib_tokens.py (BPE attempt produced too many Qwen-overlapping fragments; pivot recorded in plan.md)",
+  "base_model": "qwen-7b-extended-v1 (Qwen/Qwen2.5-Coder-7B-Instruct, fp16, embed_tokens + lm_head merge-init expanded by 227 rows, re-quantized to 4-bit)",
+  "adapter": "train/lora_adapter_v14_tokenizer (rank 16, cosine LR, 3 epochs, batch 2)",
+  "training_data": "train/dataset/agc_pairs_v13_dual.jsonl (615 source pairs, 1230 dual pairs after augment_no_tests)",
+  "token_count_method_primary": "tokenizer.encode (extended vocab, IDs 0-151891)",
+  "token_count_method_secondary": "tokenizer.encode (mlx-community/Qwen2.5-Coder-7B-Instruct-4bit, IDs 0-151664) on identical strings",
+  "claude_baseline_method": "char/3.5 estimate",
+  "date": "2026-05-08",
+  "r2_risk_status": "materialized \u2014 merge-init alone did not move the model toward emitting new tokens (Y/Z ratio ~1.00 across all problems). mlx-lm `lora_parameters.keys` config did not enable embed_tokens training in this version; --train-new-embeddings flag was bypassed for the recorded run. Future work: directly unfreeze embed_tokens rows >= 151665 in the trainer or fine-tune that layer separately.",
+  "fair_evaluator_caveat": "eval_checkpoint_cascade.py does not include the wrapper-injection / required-name-directive enhancements added to eval_bestof_n.py on 2026-05-07. Yesterday's v12 30/30 @ 417 result used eval_bestof_n.py and is NOT directly comparable to today's 850. A true v12-vs-v14 head-to-head needs both evaluators on the same cascade harness."
+}

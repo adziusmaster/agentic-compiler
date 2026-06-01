@@ -1,0 +1,3 @@
+{"category": "pure", "topic": "id", "objective": "Return n.", "solution": "(module Id (defun id (n) (return n)))", "tests_passed": 1, "source": "test"}
+{"category": "pure", "topic": "inc", "objective": "Return n+1.", "solution": "(module Inc (defun inc (n) (return (+ n 1))))", "tests_passed": 1, "source": "test"}
+{"category": "pure", "topic": "double", "objective": "Return 2n.", "solution": "(module Double (defun double (n) (return (* n 2))))", "tests_passed": 1, "source": "test"}

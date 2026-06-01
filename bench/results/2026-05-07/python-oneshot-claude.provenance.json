@@ -1,0 +1,10 @@
+{
+  "harness": "claude-code-subagent-baseline",
+  "harness_git_sha": "8b54e0b02674527d29c61a0569b7bfcb72c35c41",
+  "model": "claude-opus-4-7[1m] via Claude Code subagent (general-purpose)",
+  "prompt_template_version": "bench/run.py@HEAD (run_python python-oneshot, 2026-05-07)",
+  "token_estimation": "char/3.5 approximation (no API-reported counts available)",
+  "date": "2026-05-07",
+  "subset": "all 30 problems (gemini-baseline-substitute)",
+  "note": "Gemini Flash baseline path is dead; this run substitutes Claude Code subagents as the python-oneshot baseline. NOT directly comparable to commodity-LLM Flash baseline."
+}

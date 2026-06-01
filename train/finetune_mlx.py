@@ -34,11 +34,22 @@ INFERENCE_SYSTEM = (
 )
 
 
+_USER_WITH_TESTS = (
+    "Write an AGC module that satisfies this objective:\n\n{objective}\n\n"
+    "Include self-verifying (test ...) blocks. Output ONLY the module source."
+)
+_USER_NO_TESTS = (
+    "Write AGC code that satisfies this objective:\n\n{objective}\n\n"
+    "Write the function definitions and any (extern ...) declarations needed.\n"
+    "Output ONLY the function source — DO NOT include any (test ...) blocks "
+    "and DO NOT wrap the output in (module ...). Just the raw defuns/externs."
+)
+
+
 def to_chat(rec: dict) -> dict:
-    user = (
-        f"Write an AGC module that satisfies this objective:\n\n{rec['objective']}\n\n"
-        "Include self-verifying (test ...) blocks. Output ONLY the module source."
-    )
+    fmt = rec.get("format", "with_tests")
+    template = _USER_NO_TESTS if fmt == "no_tests" else _USER_WITH_TESTS
+    user = template.format(objective=rec["objective"])
     return {
         "messages": [
             {"role": "system", "content": INFERENCE_SYSTEM},
@@ -62,12 +73,14 @@ def split_dataset(dataset_path: Path, seed: int = 42, valid_frac: float = 0.1) -
 
 
 def run_lora(model: str, epochs: int, batch_size: int, lora_layers: int,
-             adapter_dir: Path, max_seq_length: int) -> int:
+             adapter_dir: Path, max_seq_length: int,
+             iters_override: int | None = None) -> int:
     train_path = CHAT_DIR / "train.jsonl"
     n_train = sum(1 for _ in train_path.open()) if train_path.exists() else 450
     iters_per_epoch = max(1, n_train // batch_size)
-    iters = epochs * iters_per_epoch
-    print(f"  train_examples={n_train} batch={batch_size} iters/epoch={iters_per_epoch} total_iters={iters}")
+    iters = iters_override if iters_override is not None else epochs * iters_per_epoch
+    print(f"  train_examples={n_train} batch={batch_size} iters/epoch={iters_per_epoch} total_iters={iters}"
+          + (" (override)" if iters_override is not None else ""))
     cmd = [
         sys.executable, "-m", "mlx_lm", "lora",
         "--model", model,
@@ -102,6 +115,8 @@ def main():
                     help="where to write the LoRA adapter")
     ap.add_argument("--max-seq-length", type=int, default=2048)
     ap.add_argument("--skip-split", action="store_true")
+    ap.add_argument("--iters", type=int, default=None,
+                    help="override total iters (otherwise = epochs × iters/epoch)")
     args = ap.parse_args()
 
     if not args.data.exists():
@@ -114,7 +129,7 @@ def main():
 
     args.adapter_path.mkdir(parents=True, exist_ok=True)
     return run_lora(args.model, args.epochs, args.batch_size, args.lora_layers,
-                    args.adapter_path, args.max_seq_length)
+                    args.adapter_path, args.max_seq_length, args.iters)
 
 
 if __name__ == "__main__":

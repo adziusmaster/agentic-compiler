@@ -1,0 +1,5 @@
+{"id": "01-word-count", "wall_s": 2.77, "prompt_tokens": 189, "gen_tokens": 190, "instruction_followed": false, "extracted": true, "verified": false, "passed": 1, "total": 7, "raw_output_chars": 529}
+{"id": "03-sum-digits", "wall_s": 2.16, "prompt_tokens": 195, "gen_tokens": 143, "instruction_followed": false, "extracted": true, "verified": true, "passed": 6, "total": 6, "raw_output_chars": 342}
+{"id": "05-gcd", "wall_s": 1.55, "prompt_tokens": 216, "gen_tokens": 95, "instruction_followed": false, "extracted": true, "verified": true, "passed": 7, "total": 7, "raw_output_chars": 195}
+{"id": "11-env-or-default", "wall_s": 2.14, "prompt_tokens": 232, "gen_tokens": 138, "instruction_followed": false, "extracted": true, "verified": true, "passed": 2, "total": 2, "raw_output_chars": 397}
+{"id": "21-invoice-total", "wall_s": 3.48, "prompt_tokens": 322, "gen_tokens": 232, "instruction_followed": false, "extracted": true, "verified": false, "passed": 0, "total": 6, "raw_output_chars": 515}
